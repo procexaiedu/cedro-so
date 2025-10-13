@@ -1,0 +1,138 @@
+import { createClient } from '@supabase/supabase-js'
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+  auth: {
+    persistSession: true,
+    autoRefreshToken: true,
+  },
+})
+
+// Database types based on the cedro schema
+export type Database = {
+  cedro: {
+    Tables: {
+      users: {
+        Row: {
+          id: string
+          email: string
+          name: string
+          role: 'admin' | 'therapist' | 'patient'
+          phone: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          email: string
+          name: string
+          role: 'admin' | 'therapist' | 'patient'
+          phone?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          email?: string
+          name?: string
+          role?: 'admin' | 'therapist' | 'patient'
+          phone?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+      }
+      patients: {
+        Row: {
+          id: string
+          user_id: string
+          birth_date: string | null
+          gender: string | null
+          emergency_contact: string | null
+          medical_history: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          birth_date?: string | null
+          gender?: string | null
+          emergency_contact?: string | null
+          medical_history?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          birth_date?: string | null
+          gender?: string | null
+          emergency_contact?: string | null
+          medical_history?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+      }
+      appointments: {
+        Row: {
+          id: string
+          patient_id: string
+          therapist_id: string
+          scheduled_at: string
+          duration_minutes: number
+          status: 'scheduled' | 'completed' | 'cancelled' | 'no_show'
+          notes: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          patient_id: string
+          therapist_id: string
+          scheduled_at: string
+          duration_minutes?: number
+          status?: 'scheduled' | 'completed' | 'cancelled' | 'no_show'
+          notes?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          patient_id?: string
+          therapist_id?: string
+          scheduled_at?: string
+          duration_minutes?: number
+          status?: 'scheduled' | 'completed' | 'cancelled' | 'no_show'
+          notes?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+      }
+    }
+    Views: {
+      vw_patient_overview: {
+        Row: {
+          patient_id: string
+          patient_name: string
+          patient_email: string
+          patient_phone: string | null
+          birth_date: string | null
+          gender: string | null
+          emergency_contact: string | null
+          current_therapist_id: string | null
+          current_therapist_name: string | null
+          total_appointments: number | null
+          last_appointment: string | null
+        }
+      }
+    }
+    Functions: {
+      [_ in never]: never
+    }
+    Enums: {
+      [_ in never]: never
+    }
+  }
+}

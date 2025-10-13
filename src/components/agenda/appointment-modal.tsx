@@ -1,0 +1,547 @@
+'use client'
+
+import { useState, useEffect } from 'react'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Calendar } from '@/components/ui/calendar'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { Badge } from '@/components/ui/badge'
+import { CalendarIcon, Clock, User, Stethoscope, Trash2, Save, X } from 'lucide-react'
+import { format, parseISO, addMinutes } from 'date-fns'
+import { ptBR } from 'date-fns/locale'
+import { useToast } from '@/hooks/use-toast'
+import { 
+  createAppointment, 
+  updateAppointment, 
+  deleteAppointment,
+  getLinkedPatients,
+  getLinkedTherapists,
+  isPatientLinkedToTherapist,
+  type Appointment 
+} from '@/data/agenda'
+
+type AppointmentModalProps = {
+  isOpen: boolean
+  onClose: () => void
+  onSave: () => void
+  appointment?: Appointment | null
+  mode: 'create' | 'edit' | 'view'
+  therapists: Array<{ id: string; name: string; email: string }>
+  patients: Array<{ id: string; name: string; email: string }>
+  services: Array<{ id: string; name: string; duration_minutes: number }>
+  defaultDate?: Date
+  defaultTime?: string
+}
+
+const statusOptions = [
+  { value: 'scheduled', label: 'Agendado', color: 'bg-blue-100 text-blue-800' },
+  { value: 'completed', label: 'Concluído', color: 'bg-green-100 text-green-800' },
+  { value: 'cancelled', label: 'Cancelado', color: 'bg-red-100 text-red-800' },
+  { value: 'no_show', label: 'Faltou', color: 'bg-gray-100 text-gray-800' }
+]
+
+export function AppointmentModal({
+  isOpen,
+  onClose,
+  onSave,
+  appointment,
+  mode,
+  therapists,
+  patients,
+  services,
+  defaultDate,
+  defaultTime
+}: AppointmentModalProps) {
+  const { toast } = useToast()
+  const [loading, setLoading] = useState(false)
+  const [filteredPatients, setFilteredPatients] = useState(patients)
+  const [filteredTherapists, setFilteredTherapists] = useState(therapists)
+  const [formData, setFormData] = useState({
+    patient_id: '',
+    therapist_id: '',
+    service_id: '',
+    status: 'scheduled' as 'scheduled' | 'completed' | 'cancelled' | 'no_show',
+    date: new Date(),
+    start_time: '09:00',
+    duration: 60,
+    notes: ''
+  })
+
+  const isReadOnly = mode === 'view'
+  const isEditing = mode === 'edit'
+  const isCreating = mode === 'create'
+
+  // Initialize filtered states when props change
+  useEffect(() => {
+    setFilteredPatients(patients)
+  }, [patients])
+
+  useEffect(() => {
+    setFilteredTherapists(therapists)
+  }, [therapists])
+
+  useEffect(() => {
+    if (appointment && (isEditing || mode === 'view')) {
+      const startDate = parseISO(appointment.start_at)
+      const endDate = parseISO(appointment.end_at)
+      const duration = Math.round((endDate.getTime() - startDate.getTime()) / (1000 * 60))
+      
+      setFormData({
+        patient_id: appointment.patient_id,
+        therapist_id: appointment.therapist_id,
+        service_id: appointment.service_id || '',
+        status: appointment.status,
+        date: startDate,
+        start_time: format(startDate, 'HH:mm'),
+        duration,
+        notes: appointment.notes || ''
+      })
+    } else if (isCreating) {
+      setFormData({
+        patient_id: '',
+        therapist_id: '',
+        service_id: '',
+        status: 'scheduled',
+        date: defaultDate || new Date(),
+        start_time: defaultTime || '09:00',
+        duration: 60,
+        notes: ''
+      })
+    }
+  }, [appointment, mode, defaultDate, defaultTime, isEditing, isCreating])
+
+  // Filter patients based on selected therapist
+  useEffect(() => {
+    const loadLinkedPatients = async () => {
+      if (formData.therapist_id && isCreating) {
+        try {
+          const linkedPatients = await getLinkedPatients(formData.therapist_id)
+          setFilteredPatients(linkedPatients)
+          
+          // Clear patient selection if current patient is not linked to the new therapist
+          if (formData.patient_id) {
+            const isLinked = linkedPatients.some(p => p.id === formData.patient_id)
+            if (!isLinked) {
+              setFormData(prev => ({ ...prev, patient_id: '' }))
+            }
+          }
+        } catch (error) {
+          console.error('Error loading linked patients:', error)
+          setFilteredPatients([])
+        }
+      } else {
+        // If no therapist selected or not creating, show all patients
+        setFilteredPatients(patients)
+      }
+    }
+
+    loadLinkedPatients()
+  }, [formData.therapist_id, isCreating, patients])
+
+  // Filter therapists based on selected patient
+  useEffect(() => {
+    const loadLinkedTherapists = async () => {
+      if (formData.patient_id && isCreating) {
+        try {
+          const linkedTherapists = await getLinkedTherapists(formData.patient_id)
+          setFilteredTherapists(linkedTherapists)
+          
+          // Clear therapist selection if current therapist is not linked to the new patient
+          if (formData.therapist_id) {
+            const isLinked = linkedTherapists.some(t => t.id === formData.therapist_id)
+            if (!isLinked) {
+              setFormData(prev => ({ ...prev, therapist_id: '' }))
+            }
+          }
+        } catch (error) {
+          console.error('Error loading linked therapists:', error)
+          setFilteredTherapists([])
+        }
+      } else {
+        // If no patient selected or not creating, show all therapists
+        setFilteredTherapists(therapists)
+      }
+    }
+
+    loadLinkedTherapists()
+  }, [formData.patient_id, isCreating, therapists])
+
+  const handleServiceChange = (serviceId: string) => {
+    const service = services.find(s => s.id === serviceId)
+    setFormData(prev => ({
+      ...prev,
+      service_id: serviceId,
+      duration: service?.duration_minutes || 60
+    }))
+  }
+
+  const handleSave = async () => {
+    try {
+      setLoading(true)
+
+      // Validation
+      if (!formData.patient_id || !formData.therapist_id) {
+        toast({
+          title: "Erro",
+          description: "Paciente e terapeuta são obrigatórios",
+          variant: "destructive"
+        })
+        return
+      }
+
+      // Check if patient is linked to therapist (only for new appointments)
+      if (isCreating) {
+        const isLinked = await isPatientLinkedToTherapist(formData.patient_id, formData.therapist_id)
+        if (!isLinked) {
+          toast({
+            title: "Erro",
+            description: "Este paciente não está vinculado ao terapeuta selecionado",
+            variant: "destructive"
+          })
+          return
+        }
+      }
+
+      // Calculate start and end times
+      const [hours, minutes] = formData.start_time.split(':').map(Number)
+      const startDateTime = new Date(formData.date)
+      startDateTime.setHours(hours, minutes, 0, 0)
+      
+      const endDateTime = addMinutes(startDateTime, formData.duration)
+
+      const appointmentData = {
+        patient_id: formData.patient_id,
+        therapist_id: formData.therapist_id,
+        service_id: formData.service_id || undefined,
+        start_at: startDateTime.toISOString(),
+        end_at: endDateTime.toISOString(),
+        notes: formData.notes || undefined
+      }
+
+      let success = false
+
+      if (isCreating) {
+        const result = await createAppointment(appointmentData)
+        success = !!result
+      } else if (isEditing && appointment) {
+        const result = await updateAppointment(appointment.id, {
+          ...appointmentData,
+          status: formData.status
+        })
+        success = !!result
+      }
+
+      if (success) {
+        toast({
+          title: "Sucesso",
+          description: isCreating ? "Agendamento criado com sucesso" : "Agendamento atualizado com sucesso"
+        })
+        onSave()
+        onClose()
+      } else {
+        throw new Error('Failed to save appointment')
+      }
+    } catch (error) {
+      console.error('Error saving appointment:', error)
+      toast({
+        title: "Erro",
+        description: "Não foi possível salvar o agendamento",
+        variant: "destructive"
+      })
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleDelete = async () => {
+    if (!appointment) return
+
+    try {
+      setLoading(true)
+      const success = await deleteAppointment(appointment.id)
+      
+      if (success) {
+        toast({
+          title: "Sucesso",
+          description: "Agendamento excluído com sucesso"
+        })
+        onSave()
+        onClose()
+      } else {
+        throw new Error('Failed to delete appointment')
+      }
+    } catch (error) {
+      console.error('Error deleting appointment:', error)
+      toast({
+        title: "Erro",
+        description: "Não foi possível excluir o agendamento",
+        variant: "destructive"
+      })
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const getModalTitle = () => {
+    switch (mode) {
+      case 'create': return 'Novo Agendamento'
+      case 'edit': return 'Editar Agendamento'
+      case 'view': return 'Detalhes do Agendamento'
+      default: return 'Agendamento'
+    }
+  }
+
+  const selectedPatient = patients.find(p => p.id === formData.patient_id)
+  const selectedTherapist = therapists.find(t => t.id === formData.therapist_id)
+  const selectedService = services.find(s => s.id === formData.service_id)
+  const selectedStatus = statusOptions.find(s => s.value === formData.status)
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <CalendarIcon className="h-5 w-5" />
+            {getModalTitle()}
+          </DialogTitle>
+        </DialogHeader>
+
+        <div className="space-y-6">
+          {/* Patient Selection */}
+          <div className="space-y-2">
+            <Label htmlFor="patient">Paciente *</Label>
+            {isReadOnly ? (
+              <div className="flex items-center gap-2 p-2 border rounded-md bg-gray-50">
+                <User className="h-4 w-4 text-gray-500" />
+                <span>{selectedPatient?.name || 'Não informado'}</span>
+              </div>
+            ) : (
+              <Select value={formData.patient_id} onValueChange={(value) => setFormData(prev => ({ ...prev, patient_id: value }))}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione um paciente" />
+                </SelectTrigger>
+                <SelectContent>
+                  {filteredPatients.map(patient => (
+                    <SelectItem key={patient.id} value={patient.id}>
+                      {patient.name}
+                    </SelectItem>
+                  ))}
+                  {filteredPatients.length === 0 && formData.therapist_id && (
+                    <div className="p-2 text-sm text-gray-500 text-center">
+                      Nenhum paciente vinculado a este terapeuta
+                    </div>
+                  )}
+                </SelectContent>
+              </Select>
+            )}
+          </div>
+
+          {/* Therapist Selection */}
+          <div className="space-y-2">
+            <Label htmlFor="therapist">Terapeuta *</Label>
+            {isReadOnly ? (
+              <div className="flex items-center gap-2 p-2 border rounded-md bg-gray-50">
+                <Stethoscope className="h-4 w-4 text-gray-500" />
+                <span>{selectedTherapist?.name || 'Não informado'}</span>
+              </div>
+            ) : (
+              <Select value={formData.therapist_id} onValueChange={(value) => setFormData(prev => ({ ...prev, therapist_id: value }))}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione um terapeuta" />
+                </SelectTrigger>
+                <SelectContent>
+                  {filteredTherapists.map(therapist => (
+                    <SelectItem key={therapist.id} value={therapist.id}>
+                      {therapist.name}
+                    </SelectItem>
+                  ))}
+                  {filteredTherapists.length === 0 && formData.patient_id && (
+                    <div className="p-2 text-sm text-gray-500 text-center">
+                      Nenhum terapeuta vinculado a este paciente
+                    </div>
+                  )}
+                </SelectContent>
+              </Select>
+            )}
+          </div>
+
+          {/* Service Selection */}
+          <div className="space-y-2">
+            <Label htmlFor="service">Serviço</Label>
+            {isReadOnly ? (
+              <div className="flex items-center gap-2 p-2 border rounded-md bg-gray-50">
+                <span>{selectedService?.name || 'Não informado'}</span>
+                {selectedService && (
+                  <Badge variant="secondary">{selectedService.duration_minutes}min</Badge>
+                )}
+              </div>
+            ) : (
+              <Select value={formData.service_id} onValueChange={handleServiceChange}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione um serviço (opcional)" />
+                </SelectTrigger>
+                <SelectContent>
+                  {services.map(service => (
+                    <SelectItem key={service.id} value={service.id}>
+                      <div className="flex items-center justify-between w-full">
+                        <span>{service.name}</span>
+                        <Badge variant="secondary" className="ml-2">{service.duration_minutes}min</Badge>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+          </div>
+
+          {/* Date and Time */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="space-y-2">
+              <Label>Data</Label>
+              {isReadOnly ? (
+                <div className="p-2 border rounded-md bg-gray-50">
+                  {format(formData.date, 'dd/MM/yyyy', { locale: ptBR })}
+                </div>
+              ) : (
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" className="w-full justify-start text-left font-normal">
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {format(formData.date, 'dd/MM/yyyy', { locale: ptBR })}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0">
+                    <Calendar
+                      mode="single"
+                      selected={formData.date}
+                      onSelect={(date) => date && setFormData(prev => ({ ...prev, date }))}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="start_time">Horário</Label>
+              {isReadOnly ? (
+                <div className="flex items-center gap-2 p-2 border rounded-md bg-gray-50">
+                  <Clock className="h-4 w-4 text-gray-500" />
+                  <span>{formData.start_time}</span>
+                </div>
+              ) : (
+                <Input
+                  id="start_time"
+                  type="time"
+                  value={formData.start_time}
+                  onChange={(e) => setFormData(prev => ({ ...prev, start_time: e.target.value }))}
+                />
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="duration">Duração (min)</Label>
+              {isReadOnly ? (
+                <div className="p-2 border rounded-md bg-gray-50">
+                  {formData.duration} minutos
+                </div>
+              ) : (
+                <Input
+                  id="duration"
+                  type="number"
+                  min="15"
+                  max="480"
+                  step="15"
+                  value={formData.duration}
+                  onChange={(e) => setFormData(prev => ({ ...prev, duration: parseInt(e.target.value) || 60 }))}
+                />
+              )}
+            </div>
+          </div>
+
+          {/* Status (only for edit/view) */}
+          {(isEditing || mode === 'view') && (
+            <div className="space-y-2">
+              <Label>Status</Label>
+              {isReadOnly ? (
+                <div className="flex items-center gap-2">
+                  <Badge className={selectedStatus?.color}>
+                    {selectedStatus?.label}
+                  </Badge>
+                </div>
+              ) : (
+                <Select value={formData.status} onValueChange={(value: any) => setFormData(prev => ({ ...prev, status: value }))}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {statusOptions.map(status => (
+                      <SelectItem key={status.value} value={status.value}>
+                        <Badge className={status.color}>
+                          {status.label}
+                        </Badge>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            </div>
+          )}
+
+          {/* Notes */}
+          <div className="space-y-2">
+            <Label htmlFor="notes">Observações</Label>
+            {isReadOnly ? (
+              <div className="p-2 border rounded-md bg-gray-50 min-h-[80px]">
+                {formData.notes || 'Nenhuma observação'}
+              </div>
+            ) : (
+              <Textarea
+                id="notes"
+                placeholder="Observações sobre o agendamento..."
+                value={formData.notes}
+                onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
+                rows={3}
+              />
+            )}
+          </div>
+        </div>
+
+        {/* Actions */}
+        <div className="flex justify-between pt-4">
+          <div>
+            {(isEditing || mode === 'view') && appointment && (
+              <Button
+                variant="destructive"
+                onClick={handleDelete}
+                disabled={loading}
+                className="flex items-center gap-2"
+              >
+                <Trash2 className="h-4 w-4" />
+                Excluir
+              </Button>
+            )}
+          </div>
+          
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={onClose} disabled={loading}>
+              <X className="h-4 w-4 mr-2" />
+              {isReadOnly ? 'Fechar' : 'Cancelar'}
+            </Button>
+            
+            {!isReadOnly && (
+              <Button onClick={handleSave} disabled={loading}>
+                <Save className="h-4 w-4 mr-2" />
+                {loading ? 'Salvando...' : 'Salvar'}
+              </Button>
+            )}
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  )
+}

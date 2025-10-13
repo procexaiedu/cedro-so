@@ -1,0 +1,420 @@
+-- ============================================================
+-- SCHEMA
+-- ============================================================
+create schema if not exists cedro;
+create extension if not exists pgcrypto;
+
+-- Opcional: deixar claro o search_path durante esta sessão
+-- set search_path to cedro, public;
+
+-- ============================================================
+-- USUÁRIOS (admin/therapist)
+-- ============================================================
+create table if not exists cedro.users (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  email text unique not null,
+  phone text,
+  role text check (role in ('admin','therapist')) not null,
+  gender text check (gender in ('M','F','O')),     -- permite 'Outro' para personalização
+  approaches text[] default '{}',                  -- ex.: {'TCC','Logoterapia'}
+  is_active boolean default true,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+
+-- ============================================================
+-- CRM: LEADS
+-- ============================================================
+create table if not exists cedro.crm_leads (
+  id uuid primary key default gen_random_uuid(),
+  name text,
+  phone text,
+  email text,
+  city_uf text,                 -- cidade/UF
+  is_christian boolean,         -- qualificação (simples)
+  source text,                  -- instagram|google|indicacao|whatsapp|outro
+  stage text check (stage in ('lead','mql','sql','won','lost')) not null default 'lead',
+  notes text,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+
+-- ============================================================
+-- PACIENTES
+-- ============================================================
+create table if not exists cedro.patients (
+  id uuid primary key default gen_random_uuid(),
+  full_name text not null,
+  birth_date date,
+  cpf text unique,
+  email text,
+  phone text,
+  gender text check (gender in ('M','F','O')),
+  is_christian boolean,
+  origin text,
+  marital_status text,
+  occupation text,
+  notes text,
+  address_json jsonb default '{}'::jsonb,          -- {street, number, complement, district, city, state, zip}
+  tags_text text[] default '{}',
+  -- hold/suspensão manual opcional (não usado por regra agora, só flag se precisarem)
+  is_on_hold boolean default false,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+
+create unique index if not exists cedro_patients_phone_unique
+  on cedro.patients (phone)
+  where phone is not null;
+
+-- ============================================================
+-- VÍNCULO PACIENTE ⇄ TERAPEUTA (COM HISTÓRICO)
+-- ============================================================
+create table if not exists cedro.patient_therapist_links (
+  id uuid primary key default gen_random_uuid(),
+  patient_id uuid not null references cedro.patients(id) on delete cascade,
+  therapist_id uuid not null references cedro.users(id) on delete restrict,
+  status text check (status in ('active','ended')) not null default 'active',
+  started_at timestamptz not null default now(),
+  ended_at timestamptz,
+  reason text,
+  created_at timestamptz default now()
+);
+
+create unique index if not exists cedro_uniq_active_link_per_patient
+  on cedro.patient_therapist_links (patient_id)
+  where status = 'active';
+
+-- ============================================================
+-- SERVIÇOS (catálogo)
+-- ============================================================
+create table if not exists cedro.services (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  description text,
+  default_duration_min int not null default 50,
+  base_price_cents int not null default 0,
+  active boolean default true,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+
+-- ============================================================
+-- DISPONIBILIDADE DO TERAPEUTA (grade declarada)
+-- ============================================================
+create table if not exists cedro.therapist_schedules (
+  id uuid primary key default gen_random_uuid(),
+  therapist_id uuid not null references cedro.users(id) on delete cascade,
+  weekday int check (weekday between 0 and 6) not null, -- 0=domingo ... 6=sábado
+  start_time time not null,
+  end_time time not null,
+  note text,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+
+-- ============================================================
+-- PLANOS (por terapeuta) + SALDO
+-- ============================================================
+create table if not exists cedro.care_plans (
+  id uuid primary key default gen_random_uuid(),
+  patient_id uuid not null references cedro.patients(id) on delete restrict,
+  therapist_id uuid not null references cedro.users(id) on delete restrict,
+  service_id uuid references cedro.services(id) on delete set null,
+  plan_type text check (plan_type in ('avulsa','4','10','quinzenal')) not null,
+  total_sessions int not null default 1,
+  used_sessions int not null default 0,
+  price_cents int not null,                -- preço efetivo por sessão (com desconto)
+  discount_percent int default 0,          -- até 10, conforme política
+  status text check (status in ('active','paused','ended')) not null default 'active',
+  created_at timestamptz default now(),
+  updated_at timestamptz default now(),
+  check (used_sessions <= total_sessions)
+);
+
+-- ============================================================
+-- CRÉDITOS (abater avulsa quando fechar plano)
+-- ============================================================
+create table if not exists cedro.account_credits (
+  id uuid primary key default gen_random_uuid(),
+  patient_id uuid not null references cedro.patients(id) on delete cascade,
+  origin_invoice_id uuid,                                   -- fatura da sessão avulsa
+  amount_cents int not null,                                -- valor a abater
+  applied_to_care_plan_id uuid references cedro.care_plans(id) on delete set null,
+  note text,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+
+-- ============================================================
+-- AGENDAMENTOS
+-- ============================================================
+create table if not exists cedro.appointments (
+  id uuid primary key default gen_random_uuid(),
+  patient_id uuid not null references cedro.patients(id) on delete restrict,
+  therapist_id uuid not null references cedro.users(id) on delete restrict,
+  service_id uuid references cedro.services(id) on delete set null,
+  care_plan_id uuid references cedro.care_plans(id) on delete set null, -- opcional (para abater saldo)
+  status text check (status in ('scheduled','confirmed','completed','cancelled','no_show','rescheduled')) not null default 'scheduled',
+  start_at timestamptz not null,
+  end_at timestamptz not null,
+  channel text, -- whatsapp|phone|site|internal
+  origin_message_id uuid, -- opcional (link mensagens)
+  notes text,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+
+create index if not exists cedro_idx_appt_therapist_start on cedro.appointments(therapist_id, start_at);
+create index if not exists cedro_idx_appt_status on cedro.appointments(status);
+
+-- ============================================================
+-- FINANCEIRO (ASAAS): FATURAS & PAGAMENTOS
+-- ============================================================
+create table if not exists cedro.invoices (
+  id uuid primary key default gen_random_uuid(),
+  patient_id uuid not null references cedro.patients(id) on delete restrict,
+  appointment_id uuid references cedro.appointments(id) on delete set null,
+  care_plan_id uuid references cedro.care_plans(id) on delete set null,
+  therapist_id uuid references cedro.users(id) on delete set null, -- herdado p/ relatórios/repasse
+  status text check (status in ('draft','open','paid','partial','overdue','cancelled')) not null,
+  amount_cents int not null,
+  currency text default 'BRL',
+  due_date date,
+  paid_at timestamptz,
+  asaas_customer_id text,
+  asaas_invoice_id text,
+  breakdown_json jsonb default '{}'::jsonb,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+
+create table if not exists cedro.payments (
+  id uuid primary key default gen_random_uuid(),
+  invoice_id uuid not null references cedro.invoices(id) on delete cascade,
+  amount_cents int not null,
+  method text,  -- pix|boleto|card|transfer|cash
+  status text,  -- pending|authorized|settled|failed|refunded
+  asaas_payment_id text,
+  gateway_payload_json jsonb default '{}'::jsonb,
+  paid_at timestamptz,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+
+-- ============================================================
+-- CONVERSAS (console estilo WhatsApp) + CLOSER
+-- ============================================================
+create table if not exists cedro.conversations (
+  id uuid primary key default gen_random_uuid(),
+  channel text not null,                 -- whatsapp|site|email
+  contact_key text not null,             -- ex.: telefone no padrão E.164
+  lead_id uuid references cedro.crm_leads(id) on delete set null,
+  patient_id uuid references cedro.patients(id) on delete set null,
+  closer_active boolean default false,   -- switch p/ escalar humano
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+
+create unique index if not exists cedro_uniq_conv_channel_contact
+  on cedro.conversations(channel, contact_key);
+
+-- MENSAGENS (ligadas à conversation)
+create table if not exists cedro.messages (
+  id uuid primary key default gen_random_uuid(),
+  conversation_id uuid references cedro.conversations(id) on delete cascade,
+  external_msg_id text unique,           -- id externo da Evolution API
+  channel text,                          -- redundância amigável
+  direction text check (direction in ('inbound','outbound')) not null,
+  from_addr text,
+  to_addr text[],
+  sent_at timestamptz,
+  received_at timestamptz,
+  body_text text,
+  attachments_json jsonb default '{}'::jsonb,
+  patient_id uuid references cedro.patients(id),            -- quando identificado
+  related_appointment_id uuid references cedro.appointments(id),
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+
+-- ============================================================
+-- POLÍTICAS (parâmetros configuráveis)
+-- ============================================================
+create table if not exists cedro.policies (
+  id uuid primary key default gen_random_uuid(),
+  key text unique not null,
+  value_json jsonb not null,
+  version_int int default 1,
+  updated_at timestamptz default now()
+);
+
+-- ============================================================
+-- PRONTUÁRIO & ÁUDIO (pipeline)
+-- ============================================================
+create table if not exists cedro.medical_records (
+  id uuid primary key default gen_random_uuid(),
+  patient_id uuid not null references cedro.patients(id) on delete restrict,
+  appointment_id uuid references cedro.appointments(id),
+  note_type text check (note_type in ('anamnesis','soap','evolution','prescription_draft')) not null,
+  content_json jsonb not null,
+  visibility text check (visibility in ('private','team')) not null default 'private',
+  signed_by uuid references cedro.users(id),
+  signed_at timestamptz,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+
+create table if not exists cedro.recording_jobs (
+  id uuid primary key default gen_random_uuid(),
+  patient_id uuid not null references cedro.patients(id) on delete restrict,
+  therapist_id uuid not null references cedro.users(id) on delete restrict,
+  appointment_id uuid references cedro.appointments(id),
+  -- fontes individuais (p/ captação multi-aba/dispositivo) e arquivo final mesclado
+  sources_json jsonb default '[]'::jsonb,   -- [{role:'therapist'|'patient', url:'...'}, ...]
+  audio_storage_url text,                   -- opcional: arquivo principal (se já vier único)
+  merged_audio_url text,                    -- resultado da concatenação/mescla
+  status text check (status in ('uploaded','transcribing','cleaning','structured','error')) not null default 'uploaded',
+  transcript_raw_text text,
+  transcript_clean_text text,
+  record_id uuid references cedro.medical_records(id),
+  error_msg text,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+
+-- ============================================================
+-- AUDITORIA (mínima)
+-- ============================================================
+create table if not exists cedro.audit_logs (
+  id uuid primary key default gen_random_uuid(),
+  actor_type text check (actor_type in ('user','agent','system')) not null,
+  actor_id text,
+  action text not null,
+  entity text not null,
+  entity_id text not null,
+  diff_json jsonb,
+  created_at timestamptz default now()
+);
+
+-- ============================================================
+-- TRIGGERS / FUNÇÕES DE REGRA
+-- ============================================================
+
+-- 1) Se criar novo vínculo 'active', encerrar anteriores do mesmo paciente
+create or replace function cedro.trg_close_previous_links()
+returns trigger language plpgsql as $$
+begin
+  if new.status = 'active' then
+    update cedro.patient_therapist_links
+       set status='ended', ended_at=coalesce(ended_at, now()), reason=coalesce(reason,'auto-closed')
+     where patient_id = new.patient_id
+       and status = 'active'
+       and id <> new.id;
+  end if;
+  return new;
+end $$;
+
+drop trigger if exists close_previous_links on cedro.patient_therapist_links;
+create trigger close_previous_links
+after insert on cedro.patient_therapist_links
+for each row
+execute function cedro.trg_close_previous_links();
+
+-- 2) Agendamento: paciente só pode marcar com terapeuta do vínculo ativo
+create or replace function cedro.trg_check_patient_therapist_match()
+returns trigger language plpgsql as $$
+declare
+  v_count int;
+begin
+  select count(*) into v_count
+    from cedro.patient_therapist_links
+   where patient_id = new.patient_id
+     and status = 'active'
+     and therapist_id = new.therapist_id;
+
+  if v_count = 0 then
+    raise exception 'Paciente não possui vínculo ativo com o terapeuta informado. Solicite troca formal (admin) ou ajuste o terapeuta.';
+  end if;
+
+  return new;
+end $$;
+
+drop trigger if exists check_patient_therapist_match on cedro.appointments;
+create trigger check_patient_therapist_match
+before insert or update on cedro.appointments
+for each row
+execute function cedro.trg_check_patient_therapist_match();
+
+-- 3) Agendamento com plano: garantir que o plano é do mesmo terapeuta
+create or replace function cedro.trg_validate_care_plan_match()
+returns trigger language plpgsql as $$
+declare
+  v_plan_therapist uuid;
+begin
+  if new.care_plan_id is not null then
+    select therapist_id into v_plan_therapist
+      from cedro.care_plans
+     where id = new.care_plan_id;
+
+    if v_plan_therapist is null or v_plan_therapist <> new.therapist_id then
+      raise exception 'Este agendamento precisa usar o mesmo terapeuta do plano.';
+    end if;
+  end if;
+
+  return new;
+end $$;
+
+drop trigger if exists validate_care_plan_match on cedro.appointments;
+create trigger validate_care_plan_match
+before insert or update on cedro.appointments
+for each row
+execute function cedro.trg_validate_care_plan_match();
+
+-- ============================================================
+-- (Opcional) VIEWS ÚTEIS (leitura centralizada) — cruas e simples
+-- ============================================================
+
+-- Visão 360º do paciente (resumo mínimo; expanda depois se quiser)
+create or replace view cedro.vw_patient_overview as
+select
+  p.id as patient_id,
+  p.full_name,
+  p.email,
+  p.phone,
+  l.therapist_id as current_therapist_id,
+  u.name as current_therapist_name,
+  (select count(1) from cedro.care_plans cp where cp.patient_id = p.id and cp.status='active') as active_plans,
+  (select count(1) from cedro.appointments a where a.patient_id = p.id and a.status in ('scheduled','confirmed')) as upcoming_appointments
+from cedro.patients p
+left join cedro.patient_therapist_links l
+  on l.patient_id = p.id and l.status='active'
+left join cedro.users u
+  on u.id = l.therapist_id;
+
+-- Próximos horários livres por terapeuta (ex.: nas próximas 2 semanas)
+-- Nota: esta view é demonstrativa; refine a regra de disponibilidade x ocupação conforme sua lógica.
+create or replace view cedro.vw_therapist_simple_availability as
+select
+  ts.therapist_id,
+  ts.weekday,
+  ts.start_time,
+  ts.end_time
+from cedro.therapist_schedules ts;
+
+-- Financeiro básico por fatura
+create or replace view cedro.vw_invoice_basic as
+select
+  i.id as invoice_id,
+  i.patient_id,
+  i.therapist_id,
+  i.status,
+  i.amount_cents,
+  i.due_date,
+  i.paid_at,
+  coalesce(sum(p.amount_cents) filter (where p.status='settled'),0) as paid_amount_cents
+from cedro.invoices i
+left join cedro.payments p on p.invoice_id = i.id
+group by i.id;
+
