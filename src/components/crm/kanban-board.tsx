@@ -17,6 +17,7 @@ import {
   verticalListSortingStrategy,
   useSortable
 } from '@dnd-kit/sortable'
+import { useDroppable } from '@dnd-kit/core'
 import { CSS } from '@dnd-kit/utilities'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -74,6 +75,7 @@ const COLUMN_DEFINITIONS: Omit<KanbanColumn, 'leads'>[] = [
 export function KanbanBoard({ leads, onLeadUpdate, onLeadView, onLeadEdit, onLeadDelete }: KanbanBoardProps) {
   const [activeId, setActiveId] = useState<string | null>(null)
   const [draggedLead, setDraggedLead] = useState<Lead | null>(null)
+  const [dragOverColumn, setDragOverColumn] = useState<string | null>(null)
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -98,26 +100,145 @@ export function KanbanBoard({ leads, onLeadUpdate, onLeadView, onLeadEdit, onLea
   }
 
   const handleDragOver = (event: DragOverEvent) => {
-    // Handle drag over logic if needed
+    const { over } = event
+    
+    if (over?.data?.current?.type === 'column') {
+      setDragOverColumn(over.data.current.stage)
+    } else if (over?.data?.current?.type === 'lead') {
+      // Find which column this lead belongs to
+      const targetLead = leads.find(l => l.id === over.id)
+      if (targetLead) {
+        setDragOverColumn(targetLead.stage)
+      }
+    } else {
+      setDragOverColumn(null)
+    }
+  }
+
+  // Helper function to find column by coordinates
+  const findColumnByCoordinates = (x: number, y: number): LeadStage | null => {
+    const columnElements = document.querySelectorAll('[data-column-id]')
+    
+    for (const element of columnElements) {
+      const rect = element.getBoundingClientRect()
+      if (x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom) {
+        return element.getAttribute('data-column-id') as LeadStage
+      }
+    }
+    
+    return null
   }
 
   const handleDragEnd = (event: DragEndEvent) => {
-    const { active, over } = event
+    const { active, over, delta } = event
+    
+    console.log('🔄 handleDragEnd called:', {
+      active: active?.id,
+      over: over?.id,
+      overData: over?.data,
+      dragOverColumn,
+      delta
+    })
 
-    if (!over) {
+    setDragOverColumn(null)
+
+    const leadId = active.id as string
+    let newStage: LeadStage | null = null
+
+    if (over?.data?.current?.type === 'column') {
+      // Dropped directly on a column
+      newStage = over.id as LeadStage
+      console.log('🎯 Dropped on column:', newStage)
+    } else if (over?.data?.current?.type === 'lead') {
+      // Dropped on another lead - use coordinates to find the actual column
+      console.log('🎯 Dropped on lead, using coordinates to find column')
+      
+      // Try to find column by coordinates first
+      if (active.rect?.current?.translated) {
+        const rect = active.rect.current.translated
+        const centerX = rect.left + rect.width / 2
+        const centerY = rect.top + rect.height / 2
+        
+        newStage = findColumnByCoordinates(centerX, centerY)
+        console.log('🎯 Found column by coordinates (lead drop):', {
+          coordinates: { x: centerX, y: centerY },
+          foundStage: newStage
+        })
+      }
+      
+      // Fallback to target lead's stage if coordinates don't work
+      if (!newStage) {
+        const targetLeadId = over.id as string
+        const targetLead = leads.find(l => l.id === targetLeadId)
+        
+        console.log('🎯 Fallback to target lead stage:', {
+          targetLeadId,
+          targetLeadStage: targetLead?.stage
+        })
+        
+        if (targetLead) {
+          newStage = targetLead.stage
+        }
+      }
+    } else if (dragOverColumn) {
+      // Use the last column we were hovering over
+      newStage = dragOverColumn as LeadStage
+      console.log('🎯 Using dragOverColumn:', newStage)
+    }
+
+    // If we still don't have a stage, try to find it by coordinates
+    if (!newStage && active.rect?.current?.translated) {
+      const rect = active.rect.current.translated
+      const centerX = rect.left + rect.width / 2
+      const centerY = rect.top + rect.height / 2
+      
+      newStage = findColumnByCoordinates(centerX, centerY)
+      console.log('🎯 Found column by coordinates:', {
+        coordinates: { x: centerX, y: centerY },
+        foundStage: newStage
+      })
+    }
+
+    if (!newStage) {
+      console.log('❌ No valid drop target found')
       setActiveId(null)
       setDraggedLead(null)
       return
     }
 
-    const leadId = active.id as string
-    const newStage = over.id as LeadStage
+    console.log('📋 Drag details:', {
+      leadId,
+      newStage,
+      overType: over?.data?.current?.type || 'none'
+    })
 
-    // Check if the lead is being dropped on a different column
     const lead = leads.find(l => l.id === leadId)
-    if (lead && lead.stage !== newStage) {
-      onLeadUpdate(leadId, newStage)
+    if (!lead) {
+      setActiveId(null)
+      setDraggedLead(null)
+      return
     }
+
+    // Don't update if the stage is the same
+    if (lead.stage === newStage) {
+      console.log('⏭️ No update needed:', {
+        leadExists: !!lead,
+        currentStage: lead.stage,
+        newStage
+      })
+      setActiveId(null)
+      setDraggedLead(null)
+      return
+    }
+
+    console.log('✅ Updating lead stage:', {
+      leadId,
+      from: lead.stage,
+      to: newStage
+    })
+
+    // Update the lead stage
+    onLeadUpdate(leadId, newStage)
 
     setActiveId(null)
     setDraggedLead(null)
@@ -169,7 +290,7 @@ function KanbanColumn({ column, onLeadView, onLeadEdit, onLeadDelete }: KanbanCo
   const {
     setNodeRef,
     isOver
-  } = useSortable({
+  } = useDroppable({
     id: column.id,
     data: {
       type: 'column',
@@ -180,6 +301,7 @@ function KanbanColumn({ column, onLeadView, onLeadEdit, onLeadDelete }: KanbanCo
   return (
     <div
       ref={setNodeRef}
+      data-column-id={column.id}
       className={`min-w-[300px] max-w-[300px] ${column.color} rounded-lg border-2 border-dashed transition-colors ${
         isOver ? 'border-blue-400 bg-blue-100' : ''
       }`}
@@ -354,29 +476,29 @@ function LeadCard({ lead, onView, onEdit, onDelete, isDragging = false }: LeadCa
           </Badge>
         </div>
 
-        {/* Assigned To */}
-        {lead.assigned_to_name && (
+        {/* Assigned To - COMENTADO: campo não implementado */}
+        {/* {lead.assigned_to_name && (
           <div className="flex items-center text-xs text-muted-foreground">
             <User className="mr-2 h-3 w-3" />
             <span className="truncate">{lead.assigned_to_name}</span>
           </div>
-        )}
+        )} */}
 
-        {/* Last Contact */}
-        {lead.last_contact && (
+        {/* Last Contact - COMENTADO: campo não implementado */}
+        {/* {lead.last_contact && (
           <div className="flex items-center text-xs text-muted-foreground">
             <Calendar className="mr-2 h-3 w-3" />
             <span>Último contato: {formatDate(lead.last_contact)}</span>
           </div>
-        )}
+        )} */}
 
-        {/* Next Action */}
-        {lead.next_action && (
+        {/* Next Action - COMENTADO: campo não implementado */}
+        {/* {lead.next_action && (
           <div className="bg-gray-50 rounded p-2">
             <p className="text-xs font-medium text-gray-700">Próxima ação:</p>
             <p className="text-xs text-gray-600">{lead.next_action}</p>
           </div>
-        )}
+        )} */}
 
         {/* Notes Preview */}
         {lead.notes && (

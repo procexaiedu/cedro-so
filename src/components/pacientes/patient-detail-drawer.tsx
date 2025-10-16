@@ -144,12 +144,14 @@ export function PatientDetailDrawer({
               </Avatar>
               <div>
                 <SheetTitle className="text-xl">{patient.full_name}</SheetTitle>
-                <SheetDescription className="flex items-center space-x-2">
-                  <span>{patient.email}</span>
+                <SheetDescription>
+                  {patient.email}
+                </SheetDescription>
+                <div className="mt-2">
                   <Badge variant={getStatusBadgeVariant(patient.status)}>
                     {getStatusText(patient.status)}
                   </Badge>
-                </SheetDescription>
+                </div>
               </div>
             </div>
             <div className="flex space-x-2">

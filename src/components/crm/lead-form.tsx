@@ -39,7 +39,6 @@ import {
   LeadStage,
   createLead,
   updateLead,
-  getTherapistsForAssignment,
   getLeadSources
 } from '@/data/crm'
 
@@ -49,11 +48,12 @@ const leadFormSchema = z.object({
   phone: z.string().optional(),
   source: z.string().min(1, 'Fonte é obrigatória'),
   stage: z.enum(['lead', 'mql', 'sql', 'won', 'lost']),
-  assigned_to: z.string().optional(),
+  // COMENTADO: campos não implementados no banco
+  // assigned_to: z.string().optional(),
   score: z.number().min(0).max(100).optional(),
   notes: z.string().optional(),
-  next_action: z.string().optional(),
-  next_action_date: z.string().optional(),
+  // next_action: z.string().optional(),
+  // next_action_date: z.string().optional(),
 })
 
 type LeadFormData = z.infer<typeof leadFormSchema>
@@ -65,14 +65,8 @@ interface LeadFormProps {
   onSuccess: () => void
 }
 
-interface Therapist {
-  id: string
-  name: string
-}
-
 export function LeadForm({ open, onOpenChange, lead, onSuccess }: LeadFormProps) {
   const [loading, setLoading] = useState(false)
-  const [therapists, setTherapists] = useState<Therapist[]>([])
   const [sources, setSources] = useState<string[]>([])
 
   const form = useForm<LeadFormData>({
@@ -83,33 +77,27 @@ export function LeadForm({ open, onOpenChange, lead, onSuccess }: LeadFormProps)
       phone: '',
       source: '',
       stage: 'lead',
-      assigned_to: '',
+      // COMENTADO: campos não implementados
+      // assigned_to: '',
       notes: '',
-      next_action: '',
-      next_action_date: '',
+      // next_action: '',
+      // next_action_date: '',
     },
   })
 
-  // Load therapists and sources when component mounts
+  // Load sources
   useEffect(() => {
-    const loadData = async () => {
+    const loadSources = async () => {
       try {
-        const [therapistsData, sourcesData] = await Promise.all([
-          getTherapistsForAssignment(),
-          getLeadSources()
-        ])
-        setTherapists(therapistsData)
+        const sourcesData = await getLeadSources()
         setSources(sourcesData)
       } catch (error) {
-        console.error('Error loading form data:', error)
-        toast.error('Erro ao carregar dados do formulário')
+        console.error('Error loading sources:', error)
       }
     }
 
-    if (open) {
-      loadData()
-    }
-  }, [open])
+    loadSources()
+  }, [])
 
   // Reset form when lead changes or dialog opens
   useEffect(() => {
@@ -122,10 +110,11 @@ export function LeadForm({ open, onOpenChange, lead, onSuccess }: LeadFormProps)
           phone: lead.phone || '',
           source: lead.source,
           stage: lead.stage,
-          assigned_to: lead.assigned_to || '',
+          // COMENTADO: campos não implementados
+          // assigned_to: lead.assigned_to || '',
           notes: lead.notes || '',
-          next_action: lead.next_action || '',
-          next_action_date: lead.next_action_date || '',
+          // next_action: lead.next_action || '',
+          // next_action_date: lead.next_action_date || '',
         })
       } else {
         // Creating new lead
@@ -135,10 +124,11 @@ export function LeadForm({ open, onOpenChange, lead, onSuccess }: LeadFormProps)
           phone: '',
           source: '',
           stage: 'lead',
-          assigned_to: '',
+          // COMENTADO: campos não implementados
+          // assigned_to: '',
           notes: '',
-          next_action: '',
-          next_action_date: '',
+          // next_action: '',
+          // next_action_date: '',
         })
       }
     }
@@ -156,7 +146,8 @@ export function LeadForm({ open, onOpenChange, lead, onSuccess }: LeadFormProps)
           phone: data.phone || undefined,
           source: data.source,
           stage: data.stage,
-          assigned_to: data.assigned_to || undefined,
+          // COMENTADO: campos não implementados
+          // assigned_to: data.assigned_to || undefined,
           score: data.score || 50,
           notes: data.notes || undefined,
         }
@@ -172,7 +163,8 @@ export function LeadForm({ open, onOpenChange, lead, onSuccess }: LeadFormProps)
           source: data.source,
           score: data.score || 50,
           notes: data.notes || undefined,
-          assigned_to: data.assigned_to || undefined,
+          // COMENTADO: campos não implementados
+          // assigned_to: data.assigned_to || undefined,
         }
         
         await createLead(createData)
@@ -312,8 +304,8 @@ export function LeadForm({ open, onOpenChange, lead, onSuccess }: LeadFormProps)
                 )}
               />
 
-              {/* Assigned To */}
-              <FormField
+              {/* COMENTADO: Campo Assigned To não implementado */}
+              {/* <FormField
                 control={form.control}
                 name="assigned_to"
                 render={({ field }) => (
@@ -337,12 +329,10 @@ export function LeadForm({ open, onOpenChange, lead, onSuccess }: LeadFormProps)
                     <FormMessage />
                   </FormItem>
                 )}
-              />
+              /> */}
 
-
-
-              {/* Next Action Date */}
-              <FormField
+              {/* COMENTADO: Campo Next Action Date não implementado */}
+              {/* <FormField
                 control={form.control}
                 name="next_action_date"
                 render={({ field }) => (
@@ -354,11 +344,11 @@ export function LeadForm({ open, onOpenChange, lead, onSuccess }: LeadFormProps)
                     <FormMessage />
                   </FormItem>
                 )}
-              />
+              /> */}
             </div>
 
-            {/* Next Action */}
-            <FormField
+            {/* COMENTADO: Campo Next Action não implementado */}
+            {/* <FormField
               control={form.control}
               name="next_action"
               render={({ field }) => (
@@ -370,7 +360,7 @@ export function LeadForm({ open, onOpenChange, lead, onSuccess }: LeadFormProps)
                   <FormMessage />
                 </FormItem>
               )}
-            />
+            /> */}
 
             {/* Notes */}
             <FormField

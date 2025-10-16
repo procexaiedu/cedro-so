@@ -11,16 +11,23 @@ export interface Lead {
   source: string
   stage: LeadStage
   score: number
-  last_contact?: string
-  next_action?: string
-  next_action_date?: string
   notes?: string
-  assigned_to?: string
-  assigned_to_name?: string
   created_at: string
   updated_at: string
-  converted_at?: string
-  converted_to_patient_id?: string
+  
+  // ===== CAMPOS NÃO IMPLEMENTADOS (FUTURAS FUNCIONALIDADES) =====
+  // Descomente quando implementar as colunas no banco
+  // last_contact?: string
+  // next_action?: string
+  // next_action_date?: string
+  // assigned_to?: string
+  // assigned_to_name?: string
+  // converted_at?: string
+  // converted_to_patient_id?: string
+  
+  // Campos adicionais calculados (não estão na tabela)
+  city_uf?: string
+  is_christian?: boolean
 }
 
 export type LeadStage = 'lead' | 'mql' | 'sql' | 'won' | 'lost'
@@ -183,15 +190,20 @@ export async function getLeads(
         source: item.source,
         stage: item.stage,
         score: calculatedScore,
-        last_contact: item.last_contact,
-        next_action: item.next_action,
+        // Campos existentes na tabela
         notes: item.notes,
-        assigned_to: item.assigned_to,
-        assigned_to_name: item.assigned_to_user?.name,
         created_at: item.created_at,
         updated_at: item.updated_at,
-        converted_at: item.converted_at,
-        converted_to_patient_id: item.converted_to_patient_id
+        city_uf: item.city_uf,
+        is_christian: item.is_christian
+        
+        // ===== CAMPOS COMENTADOS (NÃO IMPLEMENTADOS) =====
+        // last_contact: item.last_contact,
+        // next_action: item.next_action,
+        // assigned_to: item.assigned_to,
+        // assigned_to_name: item.assigned_to_user?.name,
+        // converted_at: item.converted_at,
+        // converted_to_patient_id: item.converted_to_patient_id
       }
     })
 
@@ -257,38 +269,47 @@ export async function getLeadById(id: string): Promise<LeadOverview | null> {
         is_christian: leadData.is_christian,
         created_at: leadData.created_at
       }),
-      last_contact: leadData.last_contact,
-      next_action: leadData.next_action,
+      // Campos existentes na tabela
       notes: leadData.notes,
-      assigned_to: leadData.assigned_to,
-      assigned_to_name: leadData.assigned_to_user?.name,
       created_at: leadData.created_at,
       updated_at: leadData.updated_at,
-      converted_at: leadData.converted_at,
-      converted_to_patient_id: leadData.converted_to_patient_id
+      city_uf: leadData.city_uf,
+      is_christian: leadData.is_christian
+      
+      // ===== CAMPOS COMENTADOS (NÃO IMPLEMENTADOS) =====
+      // last_contact: leadData.last_contact,
+      // next_action: leadData.next_action,
+      // next_action_date: leadData.next_action_date,
+      // assigned_to: leadData.assigned_to,
+      // assigned_to_name: leadData.assigned_to_name,
+      // converted_at: leadData.converted_at,
+      // converted_to_patient_id: leadData.converted_to_patient_id
     }
 
-    // Get activities
-    const { data: activitiesData } = await supabase
-      .schema('cedro')
-      .from('lead_activities')
-      .select(`
-        *,
-        created_by_user:users!lead_activities_created_by_fkey(name)
-      `)
-      .eq('lead_id', id)
-      .order('created_at', { ascending: false })
+    // Get activities - COMENTADO: tabela lead_activities não existe ainda
+    // const { data: activitiesData } = await supabase
+    //   .schema('cedro')
+    //   .from('lead_activities')
+    //   .select(`
+    //     *,
+    //     created_by_user:users!lead_activities_created_by_fkey(name)
+    //   `)
+    //   .eq('lead_id', id)
+    //   .order('created_at', { ascending: false })
 
-    const activities: LeadActivity[] = (activitiesData || []).map((item: any) => ({
-      id: item.id,
-      lead_id: item.lead_id,
-      type: item.type,
-      description: item.description,
-      created_by: item.created_by,
-      created_by_name: item.created_by_user?.name || 'Sistema',
-      created_at: item.created_at,
-      metadata: item.metadata
-    }))
+    // const activities: LeadActivity[] = (activitiesData || []).map((item: any) => ({
+    //   id: item.id,
+    //   lead_id: item.lead_id,
+    //   type: item.type,
+    //   description: item.description,
+    //   created_by: item.created_by,
+    //   created_by_name: item.created_by_user?.name || 'Sistema',
+    //   created_at: item.created_at,
+    //   metadata: item.metadata
+    // }))
+
+    // Por enquanto, activities vazio
+    const activities: LeadActivity[] = []
 
     // Calculate metrics
     const createdAt = new Date(lead.created_at)
@@ -323,7 +344,7 @@ export async function createLead(data: CreateLeadData): Promise<Lead | null> {
       source: data.source,
       stage: 'lead' as LeadStage,
       notes: data.notes,
-      assigned_to: data.assigned_to,
+      // assigned_to: data.assigned_to, // COMENTADO: campo não existe
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString()
     }
@@ -340,12 +361,12 @@ export async function createLead(data: CreateLeadData): Promise<Lead | null> {
       throw error
     }
 
-    // Create initial activity
-    await createActivity(newLead.id, {
-      type: 'note',
-      description: `Lead criado via ${data.source}`,
-      metadata: { source: data.source }
-    })
+    // Create initial activity - COMENTADO: tabela lead_activities não existe
+    // await createActivity(newLead.id, {
+    //   type: 'note',
+    //   description: `Lead criado via ${data.source}`,
+    //   metadata: { source: data.source }
+    // })
 
     return {
       id: newLead.id,
@@ -362,15 +383,20 @@ export async function createLead(data: CreateLeadData): Promise<Lead | null> {
         is_christian: newLead.is_christian,
         created_at: newLead.created_at
       }),
-      last_contact: newLead.last_contact,
-      next_action: newLead.next_action,
+      // Campos existentes na tabela
       notes: newLead.notes,
-      assigned_to: newLead.assigned_to,
-      assigned_to_name: newLead.assigned_to_user?.name,
       created_at: newLead.created_at,
       updated_at: newLead.updated_at,
-      converted_at: newLead.converted_at,
-      converted_to_patient_id: newLead.converted_to_patient_id
+      city_uf: newLead.city_uf,
+      is_christian: newLead.is_christian
+      
+      // ===== CAMPOS COMENTADOS (NÃO IMPLEMENTADOS) =====
+      // last_contact: newLead.last_contact,
+      // next_action: newLead.next_action,
+      // assigned_to: newLead.assigned_to,
+      // assigned_to_name: newLead.assigned_to_user?.name,
+      // converted_at: newLead.converted_at,
+      // converted_to_patient_id: newLead.converted_to_patient_id
     }
   } catch (error) {
     console.error('Error in createLead:', error)
@@ -411,11 +437,12 @@ export async function updateLead(id: string, data: UpdateLeadData): Promise<Lead
     // Create activities for significant changes
     if (currentLead) {
       if (data.stage && data.stage !== currentLead.stage) {
-        await createActivity(id, {
-          type: 'stage_change',
-          description: `Estágio alterado de "${currentLead.stage}" para "${data.stage}"`,
-          metadata: { old_stage: currentLead.stage, new_stage: data.stage }
-        })
+        // COMENTADO: função createActivity usa tabela que não existe
+        // await createActivity(id, {
+        //   type: 'stage_change',
+        //   description: `Estágio alterado de "${currentLead.stage}" para "${data.stage}"`,
+        //   metadata: { old_stage: currentLead.stage, new_stage: data.stage }
+        // })
       }
 
       // Score is now calculated dynamically, no need to track changes
@@ -436,15 +463,20 @@ export async function updateLead(id: string, data: UpdateLeadData): Promise<Lead
         is_christian: updatedLead.is_christian,
         created_at: updatedLead.created_at
       }),
-      last_contact: updatedLead.last_contact,
-      next_action: updatedLead.next_action,
+      // Campos existentes na tabela
       notes: updatedLead.notes,
-      assigned_to: updatedLead.assigned_to,
-      assigned_to_name: updatedLead.assigned_to_user?.name,
       created_at: updatedLead.created_at,
       updated_at: updatedLead.updated_at,
-      converted_at: updatedLead.converted_at,
-      converted_to_patient_id: updatedLead.converted_to_patient_id
+      city_uf: updatedLead.city_uf,
+      is_christian: updatedLead.is_christian
+      
+      // ===== CAMPOS COMENTADOS (NÃO IMPLEMENTADOS) =====
+      // last_contact: updatedLead.last_contact,
+      // next_action: updatedLead.next_action,
+      // assigned_to: updatedLead.assigned_to,
+      // assigned_to_name: updatedLead.assigned_to_user?.name,
+      // converted_at: updatedLead.converted_at,
+      // converted_to_patient_id: updatedLead.converted_to_patient_id
     }
   } catch (error) {
     console.error('Error in updateLead:', error)
@@ -474,50 +506,51 @@ export async function deleteLead(id: string): Promise<boolean> {
   }
 }
 
-export async function createActivity(
-  leadId: string, 
-  activity: { type: ActivityType; description: string; metadata?: Record<string, any> }
-): Promise<LeadActivity | null> {
-  try {
-    const supabase = createClient()
+// COMENTADO: função createActivity usa tabela lead_activities que não existe
+// export async function createActivity(
+//   leadId: string, 
+//   activity: { type: ActivityType; description: string; metadata?: Record<string, any> }
+// ): Promise<LeadActivity | null> {
+//   try {
+//     const supabase = createClient()
 
-    const { data: newActivity, error } = await supabase
-      .schema('cedro')
-      .from('lead_activities')
-      .insert({
-        lead_id: leadId,
-        type: activity.type,
-        description: activity.description,
-        metadata: activity.metadata,
-        created_by: 'system', // TODO: Get from auth context
-        created_at: new Date().toISOString()
-      })
-      .select(`
-        *,
-        created_by_user:users!lead_activities_created_by_fkey(name)
-      `)
-      .single()
+//     const { data: newActivity, error } = await supabase
+//       .schema('cedro')
+//       .from('lead_activities')
+//       .insert({
+//         lead_id: leadId,
+//         type: activity.type,
+//         description: activity.description,
+//         metadata: activity.metadata,
+//         created_by: 'system', // TODO: Get from auth context
+//         created_at: new Date().toISOString()
+//       })
+//       .select(`
+//         *,
+//         created_by_user:users!lead_activities_created_by_fkey(name)
+//       `)
+//       .single()
 
-    if (error) {
-      console.error('Error creating activity:', error)
-      throw error
-    }
+//     if (error) {
+//       console.error('Error creating activity:', error)
+//       throw error
+//     }
 
-    return {
-      id: newActivity.id,
-      lead_id: newActivity.lead_id,
-      type: newActivity.type,
-      description: newActivity.description,
-      created_by: newActivity.created_by,
-      created_by_name: newActivity.created_by_user?.name || 'Sistema',
-      created_at: newActivity.created_at,
-      metadata: newActivity.metadata
-    }
-  } catch (error) {
-    console.error('Error in createActivity:', error)
-    return null
-  }
-}
+//     return {
+//       id: newActivity.id,
+//       lead_id: newActivity.lead_id,
+//       type: newActivity.type,
+//       description: newActivity.description,
+//       created_by: newActivity.created_by,
+//       created_by_name: newActivity.created_by_user?.name || 'Sistema',
+//       created_at: newActivity.created_at,
+//       metadata: newActivity.metadata
+//     }
+//   } catch (error) {
+//     console.error('Error in createActivity:', error)
+//     return null
+//   }
+// }
 
 export async function getLeadStats(): Promise<LeadStats> {
   try {
@@ -552,27 +585,35 @@ export async function getLeadStats(): Promise<LeadStats> {
       return acc
     }, {} as Record<string, number>)
 
-    // Monthly conversions (current month)
-    const currentMonth = new Date().getMonth()
-    const currentYear = new Date().getFullYear()
-    const monthlyConversions = leads.filter(l => {
-      if (!l.converted_at) return false
-      const convertedDate = new Date(l.converted_at)
-      return convertedDate.getMonth() === currentMonth && convertedDate.getFullYear() === currentYear
-    }).length
+    // Monthly conversions (current month) - COMENTADO: campo converted_at não existe
+    // const currentMonth = new Date().getMonth()
+    // const currentYear = new Date().getFullYear()
+    // const monthlyConversions = leads.filter(l => {
+    //   if (!l.converted_at) return false
+    //   const convertedDate = new Date(l.converted_at)
+    //   return convertedDate.getMonth() === currentMonth && convertedDate.getFullYear() === currentYear
+    // }).length
 
-    // Pipeline stats
-    const pipelineStats = Object.entries(leadsByStage).map(([stage, count]) => ({
-      stage: getStageText(stage as LeadStage),
-      count
-    }))
+    const monthlyConversions = 0 // Por enquanto 0, até implementar converted_at
 
-    // Pending actions (simplified for now)
-    const pendingActions = [
-      { action: 'Ligações pendentes', count: leads.filter(l => l.next_action?.includes('ligar')).length },
-      { action: 'E-mails pendentes', count: leads.filter(l => l.next_action?.includes('email')).length },
-      { action: 'Reuniões agendadas', count: leads.filter(l => l.next_action?.includes('reunião')).length }
-    ]
+     // Pipeline stats
+     const pipelineStats = Object.entries(leadsByStage).map(([stage, count]) => ({
+       stage: getStageText(stage as LeadStage),
+       count
+     }))
+
+     // Pending actions (simplified for now) - COMENTADO: campo next_action não existe
+     // const pendingActions = [
+     //   { action: 'Ligações pendentes', count: leads.filter(l => l.next_action?.includes('ligar')).length },
+     //   { action: 'E-mails pendentes', count: leads.filter(l => l.next_action?.includes('email')).length },
+     //   { action: 'Reuniões agendadas', count: leads.filter(l => l.next_action?.includes('reunião')).length }
+     // ]
+
+     const pendingActions = [
+       { action: 'Ligações pendentes', count: 0 },
+       { action: 'E-mails pendentes', count: 0 },
+       { action: 'Reuniões agendadas', count: 0 }
+     ]
 
     return {
       total_leads: totalLeads,

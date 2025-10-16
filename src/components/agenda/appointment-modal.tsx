@@ -387,10 +387,7 @@ export function AppointmentModal({
                 <SelectContent>
                   {services.map(service => (
                     <SelectItem key={service.id} value={service.id}>
-                      <div className="flex items-center justify-between w-full">
-                        <span>{service.name}</span>
-                        <Badge variant="secondary" className="ml-2">{service.duration_minutes}min</Badge>
-                      </div>
+                      <span>{service.name} ({service.duration_minutes}min)</span>
                     </SelectItem>
                   ))}
                 </SelectContent>

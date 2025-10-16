@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useEffect, useState } from 'react'
 import { User, Session } from '@supabase/supabase-js'
+import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { CedroUser, mapAuthUserToCedroUser } from '@/lib/auth'
 
@@ -20,6 +21,17 @@ export function SupabaseProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null)
   const [cedroUser, setCedroUser] = useState<CedroUser | null>(null)
   const [loading, setLoading] = useState(true)
+  const router = useRouter()
+
+  // Function to handle JWT expiration
+  const handleJWTExpired = async () => {
+    console.log('🔄 JWT expired, forcing logout...')
+    await supabase.auth.signOut()
+    setSession(null)
+    setUser(null)
+    setCedroUser(null)
+    router.push('/login')
+  }
 
   useEffect(() => {
     // Get initial session

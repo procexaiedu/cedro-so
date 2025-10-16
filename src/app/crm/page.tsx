@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { AppShell } from '@/components/layout/app-shell'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -99,9 +100,11 @@ export default function CRMPage() {
                          (lead.email || '').toLowerCase().includes(searchTerm.toLowerCase())
     const matchesStage = stageFilter === 'all' || lead.stage === stageFilter
     const matchesSource = sourceFilter === 'all' || lead.source === sourceFilter
-    const matchesAssigned = assignedFilter === 'all' || 
-                           (assignedFilter === 'unassigned' && !lead.assigned_to) ||
-                           lead.assigned_to === assignedFilter
+    // Comentado temporariamente - assigned_to não implementado
+    // const matchesAssigned = assignedFilter === 'all' || 
+    //                        (assignedFilter === 'unassigned' && !lead.assigned_to) ||
+    //                        lead.assigned_to === assignedFilter
+    const matchesAssigned = true // Temporário até implementar assigned_to
 
     return matchesSearch && matchesStage && matchesSource && matchesAssigned
   })
@@ -152,12 +155,14 @@ export default function CRMPage() {
   }
 
   // Get unique assigned users for filter
-  const assignedUsers = Array.from(
-    new Set((leads || []).filter(l => l.assigned_to_name).map(l => ({ 
-      id: l.assigned_to!, 
-      name: l.assigned_to_name! 
-    })))
-  )
+  // Comentado temporariamente - assigned_to não implementado
+  // const assignedUsers = Array.from(
+  //   new Set((leads || []).filter(l => l.assigned_to_name).map(l => ({ 
+  //     id: l.assigned_to!, 
+  //     name: l.assigned_to_name! 
+  //   })))
+  // )
+  const assignedUsers: Array<{ id: string; name: string }> = [] // Temporário
 
   if (loading) {
     return (
@@ -168,7 +173,8 @@ export default function CRMPage() {
   }
 
   return (
-    <div className="space-y-8">
+    <AppShell>
+      <div className="space-y-8">
       {/* Header */}
       <div className="flex justify-between items-center">
         <div>
@@ -436,10 +442,14 @@ export default function CRMPage() {
                           {getStageText(lead.stage)}
                         </Badge>
                       </td>
-                      <td className="p-2 text-sm">{lead.assigned_to_name || '-'}</td>
-                      <td className="p-2 text-sm">
+                      {/* Comentado temporariamente - assigned_to não implementado */}
+                      {/* <td className="p-2 text-sm">{lead.assigned_to_name || '-'}</td> */}
+                      <td className="p-2 text-sm">-</td>
+                      {/* Comentado temporariamente - last_contact não implementado */}
+                      {/* <td className="p-2 text-sm">
                         {lead.last_contact ? new Date(lead.last_contact).toLocaleDateString() : '-'}
-                      </td>
+                      </td> */}
+                      <td className="p-2 text-sm">-</td>
                       <td className="p-2">
                         <div className="flex space-x-1">
                           <Button variant="ghost" size="sm" onClick={() => handleLeadView(lead)}>
@@ -484,6 +494,7 @@ export default function CRMPage() {
         lead={selectedLead}
         onSuccess={handleLeadDeleteSuccess}
       />
-    </div>
+      </div>
+    </AppShell>
   )
 }

@@ -92,8 +92,11 @@ export function LeadDetailDrawer({
           type: 'stage_change',
           description: `Estágio alterado para ${getStageText(lead.stage)}`,
           created_at: lead.updated_at,
-          created_by: lead.assigned_to || 'sistema',
-          created_by_name: lead.assigned_to_name || 'Sistema',
+          // COMENTADO: campos não implementados
+          // created_by: lead.assigned_to || 'sistema',
+          // created_by_name: lead.assigned_to_name || 'Sistema',
+          created_by: 'sistema',
+          created_by_name: 'Sistema',
           metadata: { new_stage: lead.stage }
         },
         {
@@ -101,9 +104,13 @@ export function LeadDetailDrawer({
           lead_id: lead.id,
           type: 'contact',
           description: 'Primeiro contato realizado via telefone',
-          created_at: lead.last_contact || lead.created_at,
-          created_by: lead.assigned_to || 'sistema',
-          created_by_name: lead.assigned_to_name || 'Sistema',
+          // COMENTADO: campo não implementado
+          // created_at: lead.last_contact || lead.created_at,
+          // created_by: lead.assigned_to || 'sistema',
+          // created_by_name: lead.assigned_to_name || 'Sistema',
+          created_at: lead.created_at,
+          created_by: 'sistema',
+          created_by_name: 'Sistema',
           metadata: { contact_method: 'phone' }
         }
       ]
@@ -287,6 +294,7 @@ export function LeadDetailDrawer({
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
+                  {/* COMENTADO: campos não implementados
                   {lead.assigned_to_name && (
                     <div className="flex items-center justify-between">
                       <span className="font-medium">Responsável:</span>
@@ -314,6 +322,11 @@ export function LeadDetailDrawer({
                       </div>
                     </div>
                   )}
+                  */}
+                  
+                  <div className="text-center py-4 text-muted-foreground">
+                    <p className="text-sm">Campos de responsável e ações serão implementados em breve</p>
+                  </div>
                 </CardContent>
               </Card>
 
@@ -439,7 +452,10 @@ export function LeadDetailDrawer({
                     <div className="flex justify-between">
                       <span className="text-sm font-medium">Última Interação:</span>
                       <span className="text-sm text-muted-foreground">
+                        {/* COMENTADO: campo não implementado
                         {lead.last_contact ? formatDate(lead.last_contact) : 'Nunca'}
+                        */}
+                        Nunca
                       </span>
                     </div>
                   </CardContent>

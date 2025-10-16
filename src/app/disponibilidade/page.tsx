@@ -23,10 +23,12 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useSupabase } from '@/providers/supabase-provider'
 import { 
-  getTherapistSchedules, 
+  getTherapistSchedulesByDay, 
   getScheduleExceptions,
   createScheduleException,
-  updateTherapistSchedule,
+  createTherapistSchedule,
+  updateTherapistScheduleSlot,
+  deleteTherapistSchedule,
   deleteScheduleException,
   getTherapists,
   type TherapistSchedule,
@@ -57,12 +59,18 @@ export default function DisponibilidadePage() {
   const { cedroUser } = useSupabase()
   const { toast } = useToast()
   
-  const [schedules, setSchedules] = useState<TherapistSchedule[]>([])
+  const [schedulesByDay, setSchedulesByDay] = useState<Record<number, TherapistSchedule[]>>({})
   const [exceptions, setExceptions] = useState<ScheduleException[]>([])
   const [therapists, setTherapists] = useState<any[]>([])
   const [selectedTherapist, setSelectedTherapist] = useState<string>('')
   const [isLoading, setIsLoading] = useState(false)
   const [editingSchedule, setEditingSchedule] = useState<TherapistSchedule | null>(null)
+  const [newSchedule, setNewSchedule] = useState({
+    weekday: 1,
+    start_time: '09:00',
+    end_time: '17:00',
+    note: ''
+  })
   const [newException, setNewException] = useState({
     date: '',
     start_time: '',
@@ -105,7 +113,7 @@ export default function DisponibilidadePage() {
     setIsLoading(true)
     try {
       const [schedulesData, exceptionsData] = await Promise.all([
-        getTherapistSchedules(selectedTherapist),
+        getTherapistSchedulesByDay(selectedTherapist),
         getScheduleExceptions(
           new Date(new Date().getFullYear(), new Date().getMonth(), 1), // Start of current month
           new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0), // End of current month
@@ -113,7 +121,7 @@ export default function DisponibilidadePage() {
         )
       ])
       
-      setSchedules(schedulesData)
+      setSchedulesByDay(schedulesData)
       setExceptions(exceptionsData)
     } catch (error) {
       console.error('Error loading schedule data:', error)
@@ -133,13 +141,44 @@ export default function DisponibilidadePage() {
     }
   }, [selectedTherapist, loadScheduleData])
 
-  const handleSaveSchedule = async (schedule: TherapistSchedule) => {
+  const handleCreateSchedule = async () => {
+    if (!selectedTherapist) return
+
     try {
-      const result = await updateTherapistSchedule({
+      const result = await createTherapistSchedule({
         therapist_id: selectedTherapist,
-        weekday: schedule.weekday,
+        weekday: newSchedule.weekday,
+        start_time: newSchedule.start_time,
+        end_time: newSchedule.end_time,
+        note: newSchedule.note
+      })
+
+      if (result) {
+        toast({
+          title: "Sucesso",
+          description: "Horário criado com sucesso",
+        })
+        setNewSchedule({ weekday: 1, start_time: '09:00', end_time: '17:00', note: '' })
+        loadScheduleData()
+      } else {
+        throw new Error('Failed to create schedule')
+      }
+    } catch (error) {
+      console.error('Error creating schedule:', error)
+      toast({
+        title: "Erro",
+        description: "Erro ao criar horário. Verifique se não há sobreposição com outros horários.",
+        variant: "destructive"
+      })
+    }
+  }
+
+  const handleUpdateSchedule = async (schedule: TherapistSchedule) => {
+    try {
+      const result = await updateTherapistScheduleSlot(schedule.id, {
         start_time: schedule.start_time,
-        end_time: schedule.end_time
+        end_time: schedule.end_time,
+        note: schedule.note
       })
 
       if (result) {
@@ -153,10 +192,33 @@ export default function DisponibilidadePage() {
         throw new Error('Failed to update schedule')
       }
     } catch (error) {
-      console.error('Error saving schedule:', error)
+      console.error('Error updating schedule:', error)
       toast({
         title: "Erro",
-        description: "Erro ao salvar horário",
+        description: "Erro ao atualizar horário. Verifique se não há sobreposição com outros horários.",
+        variant: "destructive"
+      })
+    }
+  }
+
+  const handleDeleteSchedule = async (scheduleId: string) => {
+    try {
+      const success = await deleteTherapistSchedule(scheduleId)
+
+      if (success) {
+        toast({
+          title: "Sucesso",
+          description: "Horário removido com sucesso",
+        })
+        loadScheduleData()
+      } else {
+        throw new Error('Failed to delete schedule')
+      }
+    } catch (error) {
+      console.error('Error deleting schedule:', error)
+      toast({
+        title: "Erro",
+        description: "Erro ao remover horário",
         variant: "destructive"
       })
     }
@@ -202,7 +264,7 @@ export default function DisponibilidadePage() {
   const handleDeleteException = async (exceptionId: string) => {
     try {
       const success = await deleteScheduleException(exceptionId)
-      
+
       if (success) {
         toast({
           title: "Sucesso",
@@ -222,162 +284,263 @@ export default function DisponibilidadePage() {
     }
   }
 
-  const getScheduleForDay = (dayOfWeek: number) => {
-    return schedules.find(s => s.weekday === dayOfWeek)
-  }
-
   return (
     <AppShell>
-      <div className="space-y-6">
-        {/* Header */}
-        <div className="flex justify-between items-center">
+      <div className="container mx-auto p-6 space-y-6">
+        <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">Disponibilidade</h1>
-            <p className="text-gray-600">Gerencie horários e exceções de agenda</p>
+            <h1 className="text-3xl font-bold tracking-tight">Disponibilidade</h1>
+            <p className="text-muted-foreground">
+              Configure os horários de disponibilidade dos terapeutas
+            </p>
           </div>
         </div>
 
-        {/* Therapist Selection */}
-        {cedroUser?.role !== 'therapist' && (
-          <Card>
-            <CardHeader>
-              <CardTitle>Selecionar Terapeuta</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Select value={selectedTherapist} onValueChange={setSelectedTherapist}>
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Selecione um terapeuta" />
-                </SelectTrigger>
-                <SelectContent>
-                  {therapists.map((therapist) => (
-                    <SelectItem key={therapist.id} value={therapist.id}>
-                      {therapist.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </CardContent>
-          </Card>
-        )}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <User className="h-5 w-5" />
+              Seleção de Terapeuta
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Select value={selectedTherapist} onValueChange={setSelectedTherapist}>
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Selecione um terapeuta" />
+              </SelectTrigger>
+              <SelectContent>
+                {therapists.map((therapist) => (
+                  <SelectItem key={therapist.id} value={therapist.id}>
+                    {therapist.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </CardContent>
+        </Card>
 
         {selectedTherapist && (
-          <Tabs defaultValue="schedule" className="space-y-4">
+          <Tabs defaultValue="schedules" className="space-y-4">
             <TabsList>
-              <TabsTrigger value="schedule">Horários Regulares</TabsTrigger>
+              <TabsTrigger value="schedules">Horários Regulares</TabsTrigger>
               <TabsTrigger value="exceptions">Exceções</TabsTrigger>
             </TabsList>
 
-            <TabsContent value="schedule" className="space-y-4">
+            <TabsContent value="schedules" className="space-y-4">
               <Card>
                 <CardHeader>
-                  <CardTitle>Horários da Semana</CardTitle>
+                  <CardTitle className="flex items-center gap-2">
+                    <Plus className="h-5 w-5" />
+                    Adicionar Novo Horário
+                  </CardTitle>
                   <CardDescription>
-                    Configure os horários de atendimento para cada dia da semana
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  {isLoading ? (
-                    <div className="text-center py-8">Carregando...</div>
-                  ) : (
-                    <div className="space-y-4">
-                      {DAYS_OF_WEEK.map((day) => {
-                        const schedule = getScheduleForDay(day.value)
-                        const isEditing = editingSchedule?.weekday === day.value
-
-                        return (
-                          <div key={day.value} className="flex items-center justify-between p-4 border rounded-lg">
-                            <div className="flex items-center space-x-4">
-                              <div className="w-32">
-                                <span className="font-medium">{day.label}</span>
-                              </div>
-                              
-                              {isEditing ? (
-                                <div className="flex items-center space-x-2">
-                                  <Select defaultValue={schedule?.start_time || ''}>
-                                    <SelectTrigger className="w-24">
-                                      <SelectValue placeholder="Início" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      {TIME_SLOTS.map((time) => (
-                                        <SelectItem key={time} value={time}>{time}</SelectItem>
-                                      ))}
-                                    </SelectContent>
-                                  </Select>
-                                  <span>até</span>
-                                  <Select defaultValue={schedule?.end_time || ''}>
-                                    <SelectTrigger className="w-24">
-                                      <SelectValue placeholder="Fim" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      {TIME_SLOTS.map((time) => (
-                                        <SelectItem key={time} value={time}>{time}</SelectItem>
-                                      ))}
-                                    </SelectContent>
-                                  </Select>
-                                </div>
-                              ) : (
-                                <div className="flex items-center space-x-2">
-                                  {schedule ? (
-                                    <>
-                                      <Clock className="h-4 w-4 text-gray-500" />
-                                      <span>{schedule.start_time} - {schedule.end_time}</span>
-                                      <Badge variant="secondary">Ativo</Badge>
-                                    </>
-                                  ) : (
-                                    <span className="text-gray-500">Não configurado</span>
-                                  )}
-                                </div>
-                              )}
-                            </div>
-
-                            <div className="flex items-center space-x-2">
-                              {isEditing ? (
-                                <>
-                                  <Button size="sm" onClick={() => handleSaveSchedule(editingSchedule)}>
-                                    <Save className="h-4 w-4" />
-                                  </Button>
-                                  <Button size="sm" variant="ghost" onClick={() => setEditingSchedule(null)}>
-                                    <X className="h-4 w-4" />
-                                  </Button>
-                                </>
-                              ) : (
-                                <Button 
-                                  size="sm" 
-                                  variant="ghost" 
-                                  onClick={() => setEditingSchedule(schedule || { 
-                                    id: '',
-                                    therapist_id: selectedTherapist, 
-                                    weekday: day.value, 
-                                    start_time: '09:00', 
-                                    end_time: '17:00',
-                                    created_at: new Date().toISOString(),
-                                    updated_at: new Date().toISOString()
-                                  })}
-                                >
-                                  <Edit className="h-4 w-4" />
-                                </Button>
-                              )}
-                            </div>
-                          </div>
-                        )
-                      })}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            </TabsContent>
-
-            <TabsContent value="exceptions" className="space-y-4">
-              {/* Create New Exception */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>Nova Exceção</CardTitle>
-                  <CardDescription>
-                    Adicione bloqueios ou horários especiais
+                    Adicione um novo horário de disponibilidade
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <div>
+                      <Label htmlFor="new-weekday">Dia da Semana</Label>
+                      <Select 
+                        value={newSchedule.weekday.toString()} 
+                        onValueChange={(value) => setNewSchedule(prev => ({ ...prev, weekday: parseInt(value) }))}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {DAYS_OF_WEEK.map((day) => (
+                            <SelectItem key={day.value} value={day.value.toString()}>
+                              {day.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label htmlFor="new-start-time">Horário de Início</Label>
+                      <Select 
+                        value={newSchedule.start_time} 
+                        onValueChange={(value) => setNewSchedule(prev => ({ ...prev, start_time: value }))}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {TIME_SLOTS.map((time) => (
+                            <SelectItem key={time} value={time}>
+                              {time}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label htmlFor="new-end-time">Horário de Fim</Label>
+                      <Select 
+                        value={newSchedule.end_time} 
+                        onValueChange={(value) => setNewSchedule(prev => ({ ...prev, end_time: value }))}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {TIME_SLOTS.map((time) => (
+                            <SelectItem key={time} value={time}>
+                              {time}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="flex items-end">
+                      <Button onClick={handleCreateSchedule} className="w-full">
+                        <Plus className="h-4 w-4 mr-2" />
+                        Adicionar
+                      </Button>
+                    </div>
+                  </div>
+                  <div>
+                    <Label htmlFor="new-note">Observações (opcional)</Label>
+                    <Input
+                      id="new-note"
+                      value={newSchedule.note}
+                      onChange={(e) => setNewSchedule(prev => ({ ...prev, note: e.target.value }))}
+                      placeholder="Observações sobre este horário..."
+                    />
+                  </div>
+                </CardContent>
+              </Card>
+
+              <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
+                {DAYS_OF_WEEK.map((day) => (
+                  <Card key={day.value}>
+                    <CardHeader>
+                      <CardTitle className="text-lg">{day.label}</CardTitle>
+                      <CardDescription>
+                        {schedulesByDay[day.value]?.length || 0} horário(s) configurado(s)
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      {schedulesByDay[day.value]?.length > 0 ? (
+                        schedulesByDay[day.value].map((schedule) => (
+                          <div key={schedule.id} className="border rounded-lg p-3 space-y-2">
+                            {editingSchedule?.id === schedule.id ? (
+                              <div className="space-y-2">
+                                <div className="flex gap-2">
+                                  <Select 
+                                    value={editingSchedule.start_time} 
+                                    onValueChange={(value) => setEditingSchedule(prev => prev ? { ...prev, start_time: value } : null)}
+                                  >
+                                    <SelectTrigger className="flex-1">
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {TIME_SLOTS.map((time) => (
+                                        <SelectItem key={time} value={time}>
+                                          {time}
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                  <Select 
+                                    value={editingSchedule.end_time} 
+                                    onValueChange={(value) => setEditingSchedule(prev => prev ? { ...prev, end_time: value } : null)}
+                                  >
+                                    <SelectTrigger className="flex-1">
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {TIME_SLOTS.map((time) => (
+                                        <SelectItem key={time} value={time}>
+                                          {time}
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+                                <Input
+                                  value={editingSchedule.note || ''}
+                                  onChange={(e) => setEditingSchedule(prev => prev ? { ...prev, note: e.target.value } : null)}
+                                  placeholder="Observações..."
+                                />
+                                <div className="flex gap-2">
+                                  <Button 
+                                    size="sm" 
+                                    onClick={() => handleUpdateSchedule(editingSchedule)}
+                                    className="flex-1"
+                                  >
+                                    <Save className="h-3 w-3 mr-1" />
+                                    Salvar
+                                  </Button>
+                                  <Button 
+                                    size="sm" 
+                                    variant="outline" 
+                                    onClick={() => setEditingSchedule(null)}
+                                    className="flex-1"
+                                  >
+                                    <X className="h-3 w-3 mr-1" />
+                                    Cancelar
+                                  </Button>
+                                </div>
+                              </div>
+                            ) : (
+                              <>
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center gap-2">
+                                    <Clock className="h-4 w-4 text-muted-foreground" />
+                                    <span className="font-medium">
+                                      {schedule.start_time} - {schedule.end_time}
+                                    </span>
+                                  </div>
+                                  <div className="flex gap-1">
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      onClick={() => setEditingSchedule(schedule)}
+                                    >
+                                      <Edit className="h-3 w-3" />
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      onClick={() => handleDeleteSchedule(schedule.id)}
+                                    >
+                                      <Trash2 className="h-3 w-3" />
+                                    </Button>
+                                  </div>
+                                </div>
+                                {schedule.note && (
+                                  <p className="text-sm text-muted-foreground">{schedule.note}</p>
+                                )}
+                              </>
+                            )}
+                          </div>
+                        ))
+                      ) : (
+                        <p className="text-sm text-muted-foreground text-center py-4">
+                          Nenhum horário configurado
+                        </p>
+                      )}
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </TabsContent>
+
+            <TabsContent value="exceptions" className="space-y-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Calendar className="h-5 w-5" />
+                    Nova Exceção
+                  </CardTitle>
+                  <CardDescription>
+                    Crie bloqueios ou horários extras para datas específicas
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
                     <div>
                       <Label htmlFor="exception-date">Data</Label>
                       <Input
@@ -388,10 +551,13 @@ export default function DisponibilidadePage() {
                       />
                     </div>
                     <div>
-                      <Label htmlFor="exception-type">Tipo</Label>
-                      <Select value={newException.kind} onValueChange={(value: 'block' | 'extra') => setNewException(prev => ({ ...prev, kind: value }))}>
+                      <Label htmlFor="exception-kind">Tipo</Label>
+                      <Select 
+                        value={newException.kind} 
+                        onValueChange={(value: 'block' | 'extra') => setNewException(prev => ({ ...prev, kind: value }))}
+                      >
                         <SelectTrigger>
-                          <SelectValue placeholder="Tipo" />
+                          <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="block">Bloqueio</SelectItem>
@@ -401,89 +567,104 @@ export default function DisponibilidadePage() {
                     </div>
                     <div>
                       <Label htmlFor="exception-start">Início</Label>
-                      <Select value={newException.start_time} onValueChange={(value) => setNewException(prev => ({ ...prev, start_time: value }))}>
+                      <Select 
+                        value={newException.start_time} 
+                        onValueChange={(value) => setNewException(prev => ({ ...prev, start_time: value }))}
+                      >
                         <SelectTrigger>
                           <SelectValue placeholder="Início" />
                         </SelectTrigger>
                         <SelectContent>
                           {TIME_SLOTS.map((time) => (
-                            <SelectItem key={time} value={time}>{time}</SelectItem>
+                            <SelectItem key={time} value={time}>
+                              {time}
+                            </SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
                     </div>
                     <div>
                       <Label htmlFor="exception-end">Fim</Label>
-                      <Select value={newException.end_time} onValueChange={(value) => setNewException(prev => ({ ...prev, end_time: value }))}>
+                      <Select 
+                        value={newException.end_time} 
+                        onValueChange={(value) => setNewException(prev => ({ ...prev, end_time: value }))}
+                      >
                         <SelectTrigger>
                           <SelectValue placeholder="Fim" />
                         </SelectTrigger>
                         <SelectContent>
                           {TIME_SLOTS.map((time) => (
-                            <SelectItem key={time} value={time}>{time}</SelectItem>
+                            <SelectItem key={time} value={time}>
+                              {time}
+                            </SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
                     </div>
-                    <div>
-                      <Label htmlFor="exception-reason">Motivo</Label>
-                      <Input
-                        id="exception-reason"
-                        placeholder="Ex: Férias, Reunião..."
-                        value={newException.note}
-                        onChange={(e) => setNewException(prev => ({ ...prev, note: e.target.value }))}
-                      />
+                    <div className="flex items-end">
+                      <Button onClick={handleCreateException} className="w-full">
+                        <Plus className="h-4 w-4 mr-2" />
+                        Criar
+                      </Button>
                     </div>
                   </div>
-                  <Button onClick={handleCreateException}>
-                    <Plus className="mr-2 h-4 w-4" />
-                    Adicionar Exceção
-                  </Button>
+                  <div>
+                    <Label htmlFor="exception-note">Observações</Label>
+                    <Input
+                      id="exception-note"
+                      value={newException.note}
+                      onChange={(e) => setNewException(prev => ({ ...prev, note: e.target.value }))}
+                      placeholder="Motivo da exceção..."
+                    />
+                  </div>
                 </CardContent>
               </Card>
 
-              {/* Existing Exceptions */}
               <Card>
                 <CardHeader>
-                  <CardTitle>Exceções Existentes</CardTitle>
+                  <CardTitle>Exceções Cadastradas</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  {exceptions.length === 0 ? (
-                    <div className="text-center py-8 text-gray-500">
-                      Nenhuma exceção cadastrada
-                    </div>
-                  ) : (
+                  <ScrollArea className="h-[400px]">
                     <div className="space-y-3">
-                      {exceptions.map((exception) => (
-                        <div key={exception.id} className="flex items-center justify-between p-4 border rounded-lg">
-                          <div className="flex items-center space-x-4">
-                            <Calendar className="h-4 w-4 text-gray-500" />
-                            <div>
-                              <div className="font-medium">
-                                {format(new Date(exception.date), 'dd/MM/yyyy', { locale: ptBR })}
+                      {exceptions.length > 0 ? (
+                        exceptions.map((exception) => (
+                          <div key={exception.id} className="border rounded-lg p-3">
+                            <div className="flex items-center justify-between">
+                              <div className="space-y-1">
+                                <div className="flex items-center gap-2">
+                                  <Badge variant={exception.kind === 'block' ? 'destructive' : 'default'}>
+                                    {exception.kind === 'block' ? 'Bloqueio' : 'Extra'}
+                                  </Badge>
+                                  <span className="font-medium">
+                                    {format(new Date(exception.date), 'dd/MM/yyyy', { locale: ptBR })}
+                                  </span>
+                                </div>
+                                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                  <Clock className="h-3 w-3" />
+                                  {exception.start_time} - {exception.end_time}
+                                </div>
+                                {exception.note && (
+                                  <p className="text-sm text-muted-foreground">{exception.note}</p>
+                                )}
                               </div>
-                              <div className="text-sm text-gray-500">
-                                {exception.start_time} - {exception.end_time}
-                              </div>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => handleDeleteException(exception.id)}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
                             </div>
-                            <Badge variant={exception.kind === 'block' ? 'destructive' : 'default'}>
-                              {exception.kind === 'block' ? 'Bloqueio' : 'Horário Extra'}
-                            </Badge>
-                            {exception.note && (
-                              <Badge variant="outline">{exception.note}</Badge>
-                            )}
                           </div>
-                          <Button 
-                            size="sm" 
-                            variant="ghost" 
-                            onClick={() => handleDeleteException(exception.id)}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      ))}
+                        ))
+                      ) : (
+                        <p className="text-center text-muted-foreground py-8">
+                          Nenhuma exceção cadastrada
+                        </p>
+                      )}
                     </div>
-                  )}
+                  </ScrollArea>
                 </CardContent>
               </Card>
             </TabsContent>

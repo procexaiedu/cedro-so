@@ -1,3 +1,5 @@
+'use client'
+
 import { AppShell } from '@/components/layout/app-shell'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -27,8 +29,11 @@ import {
   User,
   Stethoscope
 } from 'lucide-react'
+import { NewRecordModal } from '@/components/prontuarios/new-record-modal'
+import { useState } from 'react'
 
 export default function ProntuariosPage() {
+  const [isNewRecordModalOpen, setIsNewRecordModalOpen] = useState(false)
   const records = [
     { 
       id: 1, 
@@ -137,7 +142,7 @@ export default function ProntuariosPage() {
             <h1 className="text-3xl font-bold text-gray-900">Prontuários</h1>
             <p className="text-gray-600">Gerencie registros médicos e histórico dos pacientes</p>
           </div>
-          <Button>
+          <Button onClick={() => setIsNewRecordModalOpen(true)}>
             <Plus className="mr-2 h-4 w-4" />
             Novo Registro
           </Button>
@@ -395,6 +400,15 @@ export default function ProntuariosPage() {
           </TabsContent>
         </Tabs>
       </div>
+
+      <NewRecordModal
+        open={isNewRecordModalOpen}
+        onOpenChange={setIsNewRecordModalOpen}
+        onRecordCreated={() => {
+          // Aqui você pode adicionar lógica para recarregar os dados
+          console.log('Novo registro criado!')
+        }}
+      />
     </AppShell>
   )
 }

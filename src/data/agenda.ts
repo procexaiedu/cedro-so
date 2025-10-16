@@ -415,6 +415,133 @@ export async function updateTherapistSchedule(schedule: {
 }
 
 /**
+ * Create a new therapist schedule slot
+ */
+export async function createTherapistSchedule(schedule: {
+  therapist_id: string
+  weekday: number
+  start_time: string
+  end_time: string
+  note?: string
+}): Promise<TherapistSchedule | null> {
+  try {
+    const { data, error } = await supabase
+      .schema('cedro')
+      .from('therapist_schedules')
+      .insert({
+        therapist_id: schedule.therapist_id,
+        weekday: schedule.weekday,
+        start_time: schedule.start_time,
+        end_time: schedule.end_time,
+        note: schedule.note
+      })
+      .select()
+      .single()
+
+    if (error) {
+      console.error('Error creating therapist schedule:', error)
+      throw error
+    }
+
+    return data
+  } catch (error) {
+    console.error('Error in createTherapistSchedule:', error)
+    return null
+  }
+}
+
+/**
+ * Update an existing therapist schedule slot
+ */
+export async function updateTherapistScheduleSlot(
+  scheduleId: string,
+  updates: {
+    start_time?: string
+    end_time?: string
+    note?: string
+  }
+): Promise<TherapistSchedule | null> {
+  try {
+    const { data, error } = await supabase
+      .schema('cedro')
+      .from('therapist_schedules')
+      .update({
+        ...updates,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', scheduleId)
+      .select()
+      .single()
+
+    if (error) {
+      console.error('Error updating therapist schedule slot:', error)
+      throw error
+    }
+
+    return data
+  } catch (error) {
+    console.error('Error in updateTherapistScheduleSlot:', error)
+    return null
+  }
+}
+
+/**
+ * Delete a therapist schedule slot
+ */
+export async function deleteTherapistSchedule(scheduleId: string): Promise<boolean> {
+  try {
+    const { error } = await supabase
+      .schema('cedro')
+      .from('therapist_schedules')
+      .delete()
+      .eq('id', scheduleId)
+
+    if (error) {
+      console.error('Error deleting therapist schedule:', error)
+      return false
+    }
+
+    return true
+  } catch (error) {
+    console.error('Error in deleteTherapistSchedule:', error)
+    return false
+  }
+}
+
+/**
+ * Get schedules grouped by weekday for a therapist
+ */
+export async function getTherapistSchedulesByDay(therapistId: string): Promise<Record<number, TherapistSchedule[]>> {
+  try {
+    const schedules = await getTherapistSchedules(therapistId)
+    
+    const schedulesByDay: Record<number, TherapistSchedule[]> = {}
+    
+    // Initialize all days
+    for (let i = 0; i <= 6; i++) {
+      schedulesByDay[i] = []
+    }
+    
+    // Group schedules by weekday
+    schedules.forEach(schedule => {
+      schedulesByDay[schedule.weekday].push(schedule)
+    })
+    
+    // Sort schedules within each day by start time
+    Object.keys(schedulesByDay).forEach(day => {
+      schedulesByDay[parseInt(day)].sort((a, b) => 
+        a.start_time.localeCompare(b.start_time)
+      )
+    })
+    
+    return schedulesByDay
+  } catch (error) {
+    console.error('Error in getTherapistSchedulesByDay:', error)
+    return {}
+  }
+}
+
+/**
  * Delete a schedule exception
  */
 export async function deleteScheduleException(exceptionId: string): Promise<boolean> {

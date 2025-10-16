@@ -103,18 +103,10 @@ export async function getPatients(
   try {
     let query = supabase
       .schema('cedro')
-      .from('vw_patient_overview')
+      .from('patients')
       .select('*', { count: 'exact' })
 
     // Apply filters
-    if (filters.status) {
-      query = query.eq('status', filters.status)
-    }
-
-    if (filters.therapistId) {
-      query = query.eq('current_therapist_id', filters.therapistId)
-    }
-
     if (filters.search) {
       query = query.or(`full_name.ilike.%${filters.search}%,email.ilike.%${filters.search}%,phone.ilike.%${filters.search}%`)
     }
@@ -135,23 +127,23 @@ export async function getPatients(
     }
 
     const patients: Patient[] = (data || []).map((row: any) => ({
-      id: row.patient_id,
-      user_id: row.patient_id, // Assuming patient_id is the user_id
+      id: row.id,
+      user_id: row.id, // Using patient id as user_id
       full_name: row.full_name,
-      email: row.email,
+      email: row.email || '',
       phone: row.phone,
       birth_date: row.birth_date,
       gender: row.gender,
-      emergency_contact: row.emergency_contact,
-      medical_history: null, // Not in view
-      status: 'active' as PatientStatus, // Default status
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-      current_therapist_id: row.current_therapist_id,
-      current_therapist_name: row.current_therapist_name,
-      total_appointments: row.total_appointments,
-      last_appointment: row.last_appointment,
-      next_appointment: null // Not in view
+      emergency_contact: null, // Not in patients table
+      medical_history: row.notes, // Using notes as medical history
+      status: row.is_on_hold ? 'suspended' : 'active' as PatientStatus,
+      created_at: row.created_at,
+      updated_at: row.updated_at,
+      current_therapist_id: null, // Will be loaded separately if needed
+      current_therapist_name: null, // Will be loaded separately if needed
+      total_appointments: 0, // Will be calculated separately if needed
+      last_appointment: null,
+      next_appointment: null
     }))
 
     return {
@@ -181,14 +173,7 @@ export async function getPatientById(id: string): Promise<Patient | null> {
     const { data, error } = await supabase
       .schema('cedro')
       .from('patients')
-      .select(`
-        *,
-        users!inner (
-          full_name,
-          email,
-          phone
-        )
-      `)
+      .select('*')
       .eq('id', id)
       .single()
 
@@ -201,10 +186,10 @@ export async function getPatientById(id: string): Promise<Patient | null> {
 
     return {
       id: data.id,
-      user_id: data.user_id,
-      full_name: data.users.full_name,
-      email: data.users.email,
-      phone: data.users.phone,
+      user_id: data.user_id || '',
+      full_name: data.full_name,
+      email: data.email,
+      phone: data.phone,
       birth_date: data.birth_date,
       gender: data.gender,
       emergency_contact: data.emergency_contact,
@@ -231,7 +216,7 @@ export async function getPatientOverview(id: string): Promise<PatientOverview | 
     const { data: appointmentsData } = await supabase
       .schema('cedro')
       .from('appointments')
-      .select('status, scheduled_at')
+      .select('status, start_at')
       .eq('patient_id', id)
 
     const appointments = {
@@ -241,10 +226,10 @@ export async function getPatientOverview(id: string): Promise<PatientOverview | 
       cancelled: appointmentsData?.filter(a => a.status === 'cancelled').length || 0,
       last_appointment: appointmentsData
         ?.filter(a => a.status === 'completed')
-        .sort((a, b) => new Date(b.scheduled_at).getTime() - new Date(a.scheduled_at).getTime())[0]?.scheduled_at || null,
+        .sort((a, b) => new Date(b.start_at).getTime() - new Date(a.start_at).getTime())[0]?.start_at || null,
       next_appointment: appointmentsData
         ?.filter(a => a.status === 'scheduled')
-        .sort((a, b) => new Date(a.scheduled_at).getTime() - new Date(b.scheduled_at).getTime())[0]?.scheduled_at || null
+        .sort((a, b) => new Date(a.start_at).getTime() - new Date(b.start_at).getTime())[0]?.start_at || null
     }
 
     // Get therapists
@@ -257,7 +242,7 @@ export async function getPatientOverview(id: string): Promise<PatientOverview | 
         end_date,
         status,
         users!inner (
-          full_name,
+          name,
           email
         )
       `)
@@ -265,7 +250,7 @@ export async function getPatientOverview(id: string): Promise<PatientOverview | 
 
     const therapists = (therapistsData || []).map((link: any) => ({
       id: link.therapist_id,
-      name: link.users.full_name,
+      name: link.users.name,
       email: link.users.email,
       is_current: link.status === 'active',
       start_date: link.start_date,
@@ -536,6 +521,181 @@ export function getStatusText(status: PatientStatus): string {
       return 'Inativo'
     case 'suspended':
       return 'Suspenso'
+    default:
+      return 'Desconhecido'
+  }
+}
+
+// Medical Records Types and Functions
+export type MedicalRecordType = 'anamnesis' | 'soap' | 'evolution' | 'prescription_draft'
+export type MedicalRecordVisibility = 'private' | 'team'
+
+export type MedicalRecord = {
+  id: string
+  patient_id: string
+  appointment_id?: string | null
+  note_type: MedicalRecordType
+  content_json: any
+  visibility: MedicalRecordVisibility
+  signed_by?: string | null
+  signed_at?: string | null
+  created_at: string
+  updated_at: string
+  // Joined data
+  patient_name?: string
+  therapist_name?: string
+  appointment_date?: string
+}
+
+export type CreateMedicalRecordData = {
+  patient_id: string
+  appointment_id?: string | null
+  note_type: MedicalRecordType
+  content_json: any
+  visibility?: MedicalRecordVisibility
+  audio_url?: string
+}
+
+export async function createMedicalRecord(data: CreateMedicalRecordData): Promise<MedicalRecord> {
+  try {
+    const { data: record, error } = await supabase
+      .from('medical_records')
+      .insert({
+        patient_id: data.patient_id,
+        appointment_id: data.appointment_id,
+        note_type: data.note_type,
+        content_json: data.content_json,
+        visibility: data.visibility || 'private'
+      })
+      .select(`
+        *,
+        patients!inner(full_name),
+        appointments(
+          appointment_date,
+          users!appointments_therapist_id_fkey(full_name)
+        )
+      `)
+      .single()
+
+    if (error) {
+      console.error('Error creating medical record:', error)
+      throw new Error('Erro ao criar registro médico')
+    }
+
+    return {
+      ...record,
+      patient_name: record.patients?.full_name,
+      therapist_name: record.appointments?.users?.full_name,
+      appointment_date: record.appointments?.appointment_date
+    }
+  } catch (error) {
+    console.error('Error in createMedicalRecord:', error)
+    throw error
+  }
+}
+
+export async function getMedicalRecords(patientId?: string): Promise<MedicalRecord[]> {
+  try {
+    let query = supabase
+      .from('medical_records')
+      .select(`
+        *,
+        patients!inner(full_name),
+        appointments(
+          appointment_date,
+          users!appointments_therapist_id_fkey(full_name)
+        )
+      `)
+      .order('created_at', { ascending: false })
+
+    if (patientId) {
+      query = query.eq('patient_id', patientId)
+    }
+
+    const { data: records, error } = await query
+
+    if (error) {
+      console.error('Error fetching medical records:', error)
+      throw new Error('Erro ao buscar registros médicos')
+    }
+
+    return records?.map(record => ({
+      ...record,
+      patient_name: record.patients?.full_name,
+      therapist_name: record.appointments?.users?.full_name,
+      appointment_date: record.appointments?.appointment_date
+    })) || []
+  } catch (error) {
+    console.error('Error in getMedicalRecords:', error)
+    throw error
+  }
+}
+
+export async function updateMedicalRecord(id: string, data: Partial<CreateMedicalRecordData>): Promise<MedicalRecord> {
+  try {
+    const { data: record, error } = await supabase
+      .from('medical_records')
+      .update({
+        note_type: data.note_type,
+        content_json: data.content_json,
+        visibility: data.visibility,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', id)
+      .select(`
+        *,
+        patients!inner(full_name),
+        appointments(
+          appointment_date,
+          users!appointments_therapist_id_fkey(full_name)
+        )
+      `)
+      .single()
+
+    if (error) {
+      console.error('Error updating medical record:', error)
+      throw new Error('Erro ao atualizar registro médico')
+    }
+
+    return {
+      ...record,
+      patient_name: record.patients?.full_name,
+      therapist_name: record.appointments?.users?.full_name,
+      appointment_date: record.appointments?.appointment_date
+    }
+  } catch (error) {
+    console.error('Error in updateMedicalRecord:', error)
+    throw error
+  }
+}
+
+export async function deleteMedicalRecord(id: string): Promise<void> {
+  try {
+    const { error } = await supabase
+      .from('medical_records')
+      .delete()
+      .eq('id', id)
+
+    if (error) {
+      console.error('Error deleting medical record:', error)
+      throw new Error('Erro ao excluir registro médico')
+    }
+  } catch (error) {
+    console.error('Error in deleteMedicalRecord:', error)
+    throw error
+  }
+}
+
+export function getMedicalRecordTypeLabel(type: MedicalRecordType): string {
+  switch (type) {
+    case 'anamnesis':
+      return 'Anamnese'
+    case 'soap':
+      return 'SOAP'
+    case 'evolution':
+      return 'Evolução'
+    case 'prescription_draft':
+      return 'Prescrição'
     default:
       return 'Desconhecido'
   }
