@@ -139,7 +139,22 @@ export type Database = {
       }
     }
     Functions: {
-      [_ in never]: never
+      calculate_recording_progress: {
+        Args: {
+          job_id: string
+        }
+        Returns: {
+          job_id: string
+          status: string
+          progress_percentage: number
+          estimated_completion: string | null
+          created_at: string
+          updated_at: string
+          file_url: string | null
+          patient_id: string
+          therapist_id: string
+        }
+      }
     }
     Enums: {
       [_ in never]: never

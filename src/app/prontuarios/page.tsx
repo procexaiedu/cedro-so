@@ -14,7 +14,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { 
+import {
   FileText, 
   Users, 
   Calendar, 
@@ -27,110 +27,329 @@ import {
   Download,
   Clock,
   User,
-  Stethoscope
+  Stethoscope,
+  Loader2,
+  Trash2
 } from 'lucide-react'
 import { NewRecordModal } from '@/components/prontuarios/new-record-modal'
-import { useState } from 'react'
+import { ViewRecordModal } from '@/components/prontuarios/view-record-modal'
+import { EditRecordModal } from '@/components/prontuarios/edit-record-modal'
+import { useState, useEffect } from 'react'
+import { useSupabase } from '@/providers/supabase-provider'
+import { 
+  getMedicalRecords, 
+  getMedicalRecordStats, 
+  getMedicalRecordTypeLabel, 
+  getAllRecords,
+  type MedicalRecordWithLegacyFields, 
+  type MedicalRecordStats,
+  type PendingRecord 
+} from '@/data/pacientes'
 
 export default function ProntuariosPage() {
-  const [isNewRecordModalOpen, setIsNewRecordModalOpen] = useState(false)
-  const records = [
-    { 
-      id: 1, 
-      patient: 'Ana Silva', 
-      age: 34,
-      lastVisit: '2024-10-13', 
-      diagnosis: 'Hipertensão', 
-      status: 'ativo',
-      doctor: 'Dr. João Santos',
-      nextAppointment: '2024-10-20',
-      recordsCount: 12
-    },
-    { 
-      id: 2, 
-      patient: 'Carlos Mendes', 
-      age: 45,
-      lastVisit: '2024-10-12', 
-      diagnosis: 'Diabetes Tipo 2', 
-      status: 'em_tratamento',
-      doctor: 'Dra. Maria Costa',
-      nextAppointment: '2024-10-18',
-      recordsCount: 8
-    },
-    { 
-      id: 3, 
-      patient: 'Fernanda Lima', 
-      age: 28,
-      lastVisit: '2024-10-11', 
-      diagnosis: 'Ansiedade', 
-      status: 'ativo',
-      doctor: 'Dr. Pedro Oliveira',
-      nextAppointment: '2024-10-25',
-      recordsCount: 15
-    },
-    { 
-      id: 4, 
-      patient: 'Ricardo Santos', 
-      age: 52,
-      lastVisit: '2024-10-10', 
-      diagnosis: 'Artrite', 
-      status: 'monitoramento',
-      doctor: 'Dra. Ana Rodrigues',
-      nextAppointment: '2024-11-01',
-      recordsCount: 20
-    },
-    { 
-      id: 5, 
-      patient: 'Juliana Costa', 
-      age: 39,
-      lastVisit: '2024-10-09', 
-      diagnosis: 'Enxaqueca', 
-      status: 'ativo',
-      doctor: 'Dr. João Santos',
-      nextAppointment: '2024-10-22',
-      recordsCount: 6
-    }
-  ]
+  const { user, cedroUser } = useSupabase()
+  const [newRecordModalOpen, setNewRecordModalOpen] = useState(false)
+  const [viewRecordModalOpen, setViewRecordModalOpen] = useState(false)
+  const [editRecordModalOpen, setEditRecordModalOpen] = useState(false)
+  const [selectedRecord, setSelectedRecord] = useState<MedicalRecordWithLegacyFields | null>(null)
+  const [records, setRecords] = useState<PendingRecord[]>([])
+  const [stats, setStats] = useState<MedicalRecordStats | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [searchTerm, setSearchTerm] = useState('')
 
-  const recentRecords = [
-    {
-      id: 1,
-      patient: 'Ana Silva',
-      type: 'Consulta',
-      date: '2024-10-13',
-      doctor: 'Dr. João Santos',
-      summary: 'Controle de pressão arterial. Paciente apresenta melhora significativa.'
-    },
-    {
-      id: 2,
-      patient: 'Carlos Mendes',
-      type: 'Exame',
-      date: '2024-10-12',
-      doctor: 'Dra. Maria Costa',
-      summary: 'Hemoglobina glicada: 7.2%. Ajuste na medicação necessário.'
-    },
-    {
-      id: 3,
-      patient: 'Fernanda Lima',
-      type: 'Terapia',
-      date: '2024-10-11',
-      doctor: 'Dr. Pedro Oliveira',
-      summary: 'Sessão de terapia cognitivo-comportamental. Progresso positivo.'
+  useEffect(() => {
+    if (user && cedroUser) {
+      loadData()
     }
-  ]
+  }, [user, cedroUser])
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'ativo': return 'default'
-      case 'em_tratamento': return 'secondary'
-      case 'monitoramento': return 'default'
-      case 'inativo': return 'destructive'
+  const loadData = async () => {
+    try {
+      setLoading(true)
+      const [recordsData, statsData] = await Promise.all([
+        getAllRecords(),
+        getMedicalRecordStats()
+      ])
+      
+      setRecords(recordsData)
+      setStats(statsData)
+    } catch (error) {
+      console.error('Error loading medical records data:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const filteredRecords = records.filter(record => {
+    if (!searchTerm) return true
+    const searchLower = searchTerm.toLowerCase()
+    return (
+      record.patient_name?.toLowerCase().includes(searchLower) ||
+      record.therapist_name?.toLowerCase().includes(searchLower) ||
+      (record.note_type && getMedicalRecordTypeLabel(record.note_type).toLowerCase().includes(searchLower)) ||
+      (record.tipo_consulta && record.tipo_consulta.toLowerCase().includes(searchLower)) ||
+      record.content?.toLowerCase().includes(searchLower) ||
+      record.title?.toLowerCase().includes(searchLower)
+    )
+  })
+
+  const getStatusColor = (visibility: string) => {
+    switch (visibility) {
+      case 'public': return 'default'
+      case 'private': return 'secondary'
+      case 'restricted': return 'destructive'
       default: return 'secondary'
+    }
+  }
+
+  const getVisibilityLabel = (visibility: string) => {
+    switch (visibility) {
+      case 'public': return 'Público'
+      case 'private': return 'Privado'
+      case 'restricted': return 'Restrito'
+      default: return 'Desconhecido'
     }
   }
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('pt-BR')
+  }
+
+  const formatDateTime = (dateString: string) => {
+    return new Date(dateString).toLocaleString('pt-BR')
+  }
+
+  const getRecordStatusColor = (status: string) => {
+    switch (status) {
+      case 'completed': return 'default'
+      case 'processing': return 'secondary'
+      case 'uploaded': return 'outline'
+      case 'failed': return 'destructive'
+      case 'completed_with_errors': return 'destructive'
+      default: return 'secondary'
+    }
+  }
+
+  const getRecordStatusLabel = (status: string) => {
+    switch (status) {
+      case 'completed': return 'Concluído'
+      case 'processing': return 'Processando'
+      case 'uploaded': return 'Enviado'
+      case 'failed': return 'Falhou'
+      case 'completed_with_errors': return 'Concluído com erros'
+      default: return 'Desconhecido'
+    }
+  }
+
+  const getRecordTypeLabel = (record: PendingRecord) => {
+    if (record.type === 'medical_record' && record.note_type) {
+      return getMedicalRecordTypeLabel(record.note_type)
+    }
+    if (record.type === 'recording_job' && record.tipo_consulta) {
+      return record.tipo_consulta === 'anamnese' ? 'Anamnese' : 'Evolução'
+    }
+    return 'Não especificado'
+  }
+
+  const handleRecordCreated = (newRecord?: MedicalRecordWithLegacyFields) => {
+    loadData() // Reload to get all records including new ones
+  }
+
+  const handleViewRecord = (record: PendingRecord | MedicalRecordWithLegacyFields) => {
+    // Check if it's a PendingRecord
+    if ('type' in record && 'status' in record) {
+      // Only allow viewing completed medical records
+      if (record.type === 'medical_record' && record.status === 'completed') {
+        // Convert PendingRecord back to MedicalRecordWithLegacyFields for the modal
+        let contentJson: any = {};
+        if (record.content) {
+          try {
+            // Try to parse as JSON first (in case it's already a JSON string)
+            const parsedContent = JSON.parse(record.content);
+            contentJson = parsedContent;
+          } catch {
+            // If parsing fails, treat as plain markdown content
+            contentJson = { markdown_content: record.content };
+          }
+        }
+        
+        const medicalRecord: MedicalRecordWithLegacyFields = {
+          id: record.id,
+          patient_id: record.patient_id,
+          appointment_id: record.appointment_id || null,
+          note_type: record.note_type!,
+          visibility: 'private',
+          content_json: contentJson,
+          created_at: record.created_at,
+          updated_at: record.created_at,
+          patient_name: record.patient_name,
+          therapist_name: record.therapist_name,
+          appointment_date: undefined,
+          content: record.content
+        }
+        setSelectedRecord(medicalRecord)
+        setViewRecordModalOpen(true)
+      }
+    } else {
+      // It's already a MedicalRecordWithLegacyFields
+      setSelectedRecord(record)
+      setViewRecordModalOpen(true)
+    }
+  }
+
+  const handleEditRecord = (record: PendingRecord | MedicalRecordWithLegacyFields) => {
+    // Check if it's a PendingRecord
+    if ('type' in record && 'status' in record) {
+      // Only allow editing completed medical records
+      if (record.type === 'medical_record' && record.status === 'completed') {
+        // Convert PendingRecord back to MedicalRecordWithLegacyFields for the modal
+        let contentJson: any = {};
+        if (record.content) {
+          try {
+            // Try to parse as JSON first (in case it's already a JSON string)
+            const parsedContent = JSON.parse(record.content);
+            contentJson = parsedContent;
+          } catch {
+            // If parsing fails, treat as plain markdown content
+            contentJson = { markdown_content: record.content };
+          }
+        }
+        
+        const medicalRecord: MedicalRecordWithLegacyFields = {
+          id: record.id,
+          patient_id: record.patient_id,
+          appointment_id: record.appointment_id || null,
+          note_type: record.note_type!,
+          visibility: 'private',
+          content_json: contentJson,
+          created_at: record.created_at,
+          updated_at: record.created_at,
+          patient_name: record.patient_name,
+          therapist_name: record.therapist_name,
+          appointment_date: undefined,
+          content: record.content
+        }
+        setSelectedRecord(medicalRecord)
+        setEditRecordModalOpen(true)
+      }
+    } else {
+      // It's already a MedicalRecordWithLegacyFields
+      setSelectedRecord(record)
+      setEditRecordModalOpen(true)
+    }
+  }
+
+  const handleRecordUpdated = (updatedRecord: MedicalRecordWithLegacyFields) => {
+    loadData() // Reload to get updated records
+  }
+
+  const handleDownloadRecord = (record: PendingRecord | MedicalRecordWithLegacyFields) => {
+    // Extract content from different sources
+    const getRecordContent = () => {
+      // Check if it's a MedicalRecordWithLegacyFields
+      if ('content_json' in record && record.content_json?.markdown_content) {
+        return record.content_json.markdown_content
+      }
+      if (record.content) {
+        return record.content
+      }
+      return null
+    }
+
+    const getTranscriptionContent = () => {
+      // Check if it's a MedicalRecordWithLegacyFields
+      if ('content_json' in record && record.content_json?.raw_transcript) {
+        return record.content_json.raw_transcript
+      }
+      if ('transcription' in record && record.transcription) {
+        return record.transcription
+      }
+      return null
+    }
+
+    const content = getRecordContent()
+    const transcription = getTranscriptionContent()
+    
+    const downloadContent = `
+PRONTUÁRIO MÉDICO
+================
+
+Paciente: ${record.patient_name || 'Não informado'}
+Terapeuta: ${record.therapist_name || 'Não informado'}
+Tipo: ${'note_type' in record && record.note_type ? getMedicalRecordTypeLabel(record.note_type) : 'Não especificado'}
+Data: ${formatDateTime(record.created_at)}
+Visibilidade: ${'visibility' in record ? getVisibilityLabel(record.visibility) : 'Não especificado'}
+
+CONTEÚDO:
+${content || 'Sem conteúdo disponível'}
+
+${'audio_url' in record && record.audio_url ? `\nÁudio disponível: ${record.audio_url}` : ''}
+${transcription ? `\nTranscrição: ${transcription}` : ''}
+    `.trim()
+
+    const blob = new Blob([downloadContent], { type: 'text/plain;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `prontuario_${record.patient_name?.replace(/\s+/g, '_') || 'paciente'}_${new Date(record.created_at).toISOString().split('T')[0]}.txt`
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    URL.revokeObjectURL(url)
+  }
+
+  const handleDeleteRecord = async (record: MedicalRecordWithLegacyFields | PendingRecord) => {
+    const isPendingRecord = 'type' in record && (record.type === 'recording_job' || record.type === 'medical_record')
+    const confirmMessage = isPendingRecord && record.type === 'medical_record'
+      ? `Tem certeza que deseja deletar este prontuário de ${record.patient_name || 'paciente não identificado'}?`
+      : `Tem certeza que deseja deletar este registro de processamento de ${record.patient_name || 'paciente não identificado'}?`
+    
+    if (!confirm(confirmMessage)) {
+      return
+    }
+
+    try {
+      let endpoint = ''
+      
+      if (isPendingRecord && record.type === 'medical_record') {
+        // Delete processed medical record
+        endpoint = `/api/medical-records/${record.id}`
+      } else {
+        // Delete pending recording job
+        endpoint = `/api/recording-jobs/${record.id}`
+      }
+
+      const response = await fetch(endpoint, {
+        method: 'DELETE',
+      })
+
+      if (!response.ok) {
+        throw new Error('Erro ao deletar registro')
+      }
+
+      // Refresh data after deletion
+      loadData()
+      
+      // Show success message
+      alert(isPendingRecord && record.type === 'medical_record' 
+        ? 'Prontuário deletado com sucesso!' 
+        : 'Registro de processamento deletado com sucesso!')
+        
+    } catch (error) {
+      console.error('Erro ao deletar registro:', error)
+      alert('Erro ao deletar registro. Tente novamente.')
+    }
+  }
+
+  if (loading) {
+    return (
+      <AppShell>
+        <div className="flex items-center justify-center h-64">
+          <Loader2 className="h-8 w-8 animate-spin" />
+          <span className="ml-2">Carregando prontuários...</span>
+        </div>
+      </AppShell>
+    )
   }
 
   return (
@@ -142,11 +361,29 @@ export default function ProntuariosPage() {
             <h1 className="text-3xl font-bold text-gray-900">Prontuários</h1>
             <p className="text-gray-600">Gerencie registros médicos e histórico dos pacientes</p>
           </div>
-          <Button onClick={() => setIsNewRecordModalOpen(true)}>
+          <Button onClick={() => setNewRecordModalOpen(true)}>
             <Plus className="mr-2 h-4 w-4" />
             Novo Registro
           </Button>
         </div>
+
+        {/* Processing Status Banner */}
+        {records.some(record => record.status === 'processing' || record.status === 'uploaded') && (
+          <Card className="border-blue-200 bg-blue-50">
+            <CardContent className="pt-6">
+              <div className="flex items-center space-x-3">
+                <Loader2 className="h-5 w-5 animate-spin text-blue-600" />
+                <div>
+                  <h3 className="font-medium text-blue-900">Registros em Processamento</h3>
+                  <p className="text-sm text-blue-700">
+                    {records.filter(r => r.status === 'processing').length} registros sendo processados, 
+                    {records.filter(r => r.status === 'uploaded').length} aguardando processamento
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Medical Records Stats */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
@@ -156,9 +393,9 @@ export default function ProntuariosPage() {
               <FileText className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">1,247</div>
+              <div className="text-2xl font-bold">{stats?.total_records || 0}</div>
               <p className="text-xs text-muted-foreground">
-                +23 este mês
+                Registros no sistema
               </p>
             </CardContent>
           </Card>
@@ -169,7 +406,7 @@ export default function ProntuariosPage() {
               <Users className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">342</div>
+              <div className="text-2xl font-bold">{stats?.active_patients || 0}</div>
               <p className="text-xs text-muted-foreground">
                 Em tratamento ativo
               </p>
@@ -182,7 +419,7 @@ export default function ProntuariosPage() {
               <Calendar className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">18</div>
+              <div className="text-2xl font-bold">{stats?.records_today || 0}</div>
               <p className="text-xs text-muted-foreground">
                 Novos registros
               </p>
@@ -195,7 +432,7 @@ export default function ProntuariosPage() {
               <AlertTriangle className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">5</div>
+              <div className="text-2xl font-bold">{stats?.medical_alerts || 0}</div>
               <p className="text-xs text-muted-foreground">
                 Requerem atenção
               </p>
@@ -220,8 +457,10 @@ export default function ProntuariosPage() {
                     <div className="relative">
                       <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
                       <Input
-                        placeholder="Buscar por paciente, diagnóstico ou médico..."
+                        placeholder="Buscar por paciente, tipo de registro ou terapeuta..."
                         className="pl-10"
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
                       />
                     </div>
                   </div>
@@ -236,70 +475,109 @@ export default function ProntuariosPage() {
             {/* Medical Records Table */}
             <Card>
               <CardHeader>
-                <CardTitle>Prontuários dos Pacientes</CardTitle>
+                <CardTitle>Registros Médicos</CardTitle>
                 <CardDescription>
-                  Visualize e gerencie os prontuários médicos
+                  Visualize e gerencie os registros médicos dos pacientes
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Paciente</TableHead>
-                      <TableHead>Idade</TableHead>
-                      <TableHead>Última Consulta</TableHead>
-                      <TableHead>Diagnóstico Principal</TableHead>
-                      <TableHead>Médico Responsável</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Próxima Consulta</TableHead>
-                      <TableHead>Registros</TableHead>
-                      <TableHead>Ações</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {records.map((record) => (
-                      <TableRow key={record.id}>
-                        <TableCell>
-                          <div className="flex items-center space-x-2">
-                            <User className="h-4 w-4 text-gray-400" />
-                            <span className="font-medium">{record.patient}</span>
-                          </div>
-                        </TableCell>
-                        <TableCell>{record.age} anos</TableCell>
-                        <TableCell>{formatDate(record.lastVisit)}</TableCell>
-                        <TableCell>
-                          <div className="flex items-center space-x-2">
-                            <Stethoscope className="h-4 w-4 text-gray-400" />
-                            <span>{record.diagnosis}</span>
-                          </div>
-                        </TableCell>
-                        <TableCell>{record.doctor}</TableCell>
-                        <TableCell>
-                          <Badge variant={getStatusColor(record.status)}>
-                            {record.status.replace('_', ' ')}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>{formatDate(record.nextAppointment)}</TableCell>
-                        <TableCell>
-                          <Badge variant="outline">{record.recordsCount}</Badge>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex space-x-1">
-                            <Button variant="ghost" size="sm">
-                              <Eye className="h-4 w-4" />
-                            </Button>
-                            <Button variant="ghost" size="sm">
-                              <Edit className="h-4 w-4" />
-                            </Button>
-                            <Button variant="ghost" size="sm">
-                              <Download className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </TableCell>
+                {filteredRecords.length === 0 ? (
+                  <div className="text-center py-8">
+                    <FileText className="mx-auto h-12 w-12 text-gray-400" />
+                    <h3 className="mt-2 text-sm font-medium text-gray-900">Nenhum registro encontrado</h3>
+                    <p className="mt-1 text-sm text-gray-500">
+                      {searchTerm ? 'Tente ajustar os termos de busca.' : 'Comece criando um novo registro médico.'}
+                    </p>
+                  </div>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Paciente</TableHead>
+                        <TableHead>Tipo</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Data</TableHead>
+                        <TableHead>Terapeuta</TableHead>
+                        <TableHead>Ações</TableHead>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredRecords.map((record) => (
+                        <TableRow 
+                          key={record.id}
+                          className={record.status !== 'completed' ? 'bg-blue-50 border-l-4 border-l-blue-400' : ''}
+                        >
+                          <TableCell>
+                            <div className="flex items-center space-x-2">
+                              <User className="h-4 w-4 text-gray-400" />
+                              <span className="font-medium">{record.patient_name || 'Paciente não identificado'}</span>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="outline">
+                              {getRecordTypeLabel(record)}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center space-x-2">
+                              {record.status === 'processing' && <Loader2 className="h-4 w-4 animate-spin text-blue-500" />}
+                              <Badge variant={getRecordStatusColor(record.status)}>
+                                {getRecordStatusLabel(record.status)}
+                              </Badge>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center space-x-2">
+                              <Clock className="h-4 w-4 text-gray-400" />
+                              <span>{formatDateTime(record.created_at)}</span>
+                            </div>
+                          </TableCell>
+                          <TableCell>{record.therapist_name || 'Não informado'}</TableCell>
+                          <TableCell>
+                            <div className="flex space-x-1">
+                              {record.type === 'medical_record' && record.status === 'completed' ? (
+                                <>
+                                  <Button variant="ghost" size="sm" title="Visualizar" onClick={() => handleViewRecord(record)}>
+                                    <Eye className="h-4 w-4" />
+                                  </Button>
+                                  <Button variant="ghost" size="sm" title="Editar" onClick={() => handleEditRecord(record)}>
+                                    <Edit className="h-4 w-4" />
+                                  </Button>
+                                  <Button variant="ghost" size="sm" title="Download" onClick={() => handleDownloadRecord(record)}>
+                                    <Download className="h-4 w-4" />
+                                  </Button>
+                                  <Button variant="ghost" size="sm" title="Deletar" onClick={() => handleDeleteRecord(record)}>
+                                    <Trash2 className="h-4 w-4 text-red-500" />
+                                  </Button>
+                                </>
+                              ) : (
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center space-x-2 text-sm text-gray-500">
+                                    {record.status === 'processing' && (
+                                      <>
+                                        <Loader2 className="h-4 w-4 animate-spin" />
+                                        <span>Processando...</span>
+                                      </>
+                                    )}
+                                    {record.status === 'uploaded' && (
+                                      <span>Aguardando processamento</span>
+                                    )}
+                                    {record.status === 'failed' && (
+                                      <span className="text-red-500">Falha no processamento</span>
+                                    )}
+                                  </div>
+                                  <Button variant="ghost" size="sm" title="Deletar" onClick={() => handleDeleteRecord(record)}>
+                                    <Trash2 className="h-4 w-4 text-red-500" />
+                                  </Button>
+                                </div>
+                              )}
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
@@ -313,38 +591,56 @@ export default function ProntuariosPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
-                  {recentRecords.map((record) => (
-                    <div key={record.id} className="border rounded-lg p-4 space-y-2">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center space-x-2">
-                          <Badge variant="outline">{record.type}</Badge>
-                          <span className="font-medium">{record.patient}</span>
+                {stats?.recent_records && stats.recent_records.length > 0 ? (
+                  <div className="space-y-4">
+                    {stats.recent_records.map((record) => (
+                      <div key={record.id} className="border rounded-lg p-4 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center space-x-2">
+                            <Badge variant="outline">{getMedicalRecordTypeLabel(record.note_type)}</Badge>
+                            <span className="font-medium">{record.patient_name || 'Paciente não identificado'}</span>
+                          </div>
+                          <div className="flex items-center space-x-2 text-sm text-gray-500">
+                            <Clock className="h-4 w-4" />
+                            {formatDateTime(record.created_at)}
+                          </div>
                         </div>
-                        <div className="flex items-center space-x-2 text-sm text-gray-500">
-                          <Clock className="h-4 w-4" />
-                          {formatDate(record.date)}
+                        <div className="text-sm text-gray-600">
+                          <strong>Terapeuta:</strong> {record.therapist_name || 'Não informado'}
+                        </div>
+                        <div className="text-sm">
+                          {record.content_json?.content ? record.content_json.content.substring(0, 150) + '...' : 'Sem conteúdo disponível'}
+                        </div>
+                        <div className="flex space-x-2 pt-2">
+                          <Button variant="ghost" size="sm" onClick={() => handleViewRecord(record)}>
+                            <Eye className="mr-2 h-4 w-4" />
+                            Ver Detalhes
+                          </Button>
+                          <Button variant="ghost" size="sm" onClick={() => handleEditRecord(record)}>
+                            <Edit className="mr-2 h-4 w-4" />
+                            Editar
+                          </Button>
+                          <Button variant="ghost" size="sm" onClick={() => handleDownloadRecord(record)}>
+                            <Download className="mr-2 h-4 w-4" />
+                            Download
+                          </Button>
+                          <Button variant="ghost" size="sm" onClick={() => handleDeleteRecord(record)}>
+                            <Trash2 className="mr-2 h-4 w-4 text-red-500" />
+                            Deletar
+                          </Button>
                         </div>
                       </div>
-                      <div className="text-sm text-gray-600">
-                        <strong>Médico:</strong> {record.doctor}
-                      </div>
-                      <div className="text-sm">
-                        {record.summary}
-                      </div>
-                      <div className="flex space-x-2 pt-2">
-                        <Button variant="ghost" size="sm">
-                          <Eye className="mr-2 h-4 w-4" />
-                          Ver Detalhes
-                        </Button>
-                        <Button variant="ghost" size="sm">
-                          <Edit className="mr-2 h-4 w-4" />
-                          Editar
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-8">
+                    <FileText className="mx-auto h-12 w-12 text-gray-400" />
+                    <h3 className="mt-2 text-sm font-medium text-gray-900">Nenhum registro recente</h3>
+                    <p className="mt-1 text-sm text-gray-500">
+                      Os registros recentes aparecerão aqui quando forem criados.
+                    </p>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
@@ -358,42 +654,12 @@ export default function ProntuariosPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
-                  <div className="border-l-4 border-red-500 bg-red-50 p-4 rounded">
-                    <div className="flex items-center space-x-2">
-                      <AlertTriangle className="h-5 w-5 text-red-500" />
-                      <span className="font-medium text-red-800">Alerta Crítico</span>
-                    </div>
-                    <div className="mt-2">
-                      <p className="text-sm text-red-700">
-                        <strong>Ana Silva</strong> - Pressão arterial elevada na última consulta. Requer monitoramento imediato.
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="border-l-4 border-yellow-500 bg-yellow-50 p-4 rounded">
-                    <div className="flex items-center space-x-2">
-                      <AlertTriangle className="h-5 w-5 text-yellow-500" />
-                      <span className="font-medium text-yellow-800">Atenção</span>
-                    </div>
-                    <div className="mt-2">
-                      <p className="text-sm text-yellow-700">
-                        <strong>Carlos Mendes</strong> - Exames de rotina em atraso há 3 meses.
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="border-l-4 border-blue-500 bg-blue-50 p-4 rounded">
-                    <div className="flex items-center space-x-2">
-                      <AlertTriangle className="h-5 w-5 text-blue-500" />
-                      <span className="font-medium text-blue-800">Lembrete</span>
-                    </div>
-                    <div className="mt-2">
-                      <p className="text-sm text-blue-700">
-                        <strong>Fernanda Lima</strong> - Próxima sessão de terapia agendada para amanhã.
-                      </p>
-                    </div>
-                  </div>
+                <div className="text-center py-8">
+                  <AlertTriangle className="mx-auto h-12 w-12 text-gray-400" />
+                  <h3 className="mt-2 text-sm font-medium text-gray-900">Sistema de alertas em desenvolvimento</h3>
+                  <p className="mt-1 text-sm text-gray-500">
+                    Os alertas médicos serão implementados em uma próxima versão.
+                  </p>
                 </div>
               </CardContent>
             </Card>
@@ -402,12 +668,22 @@ export default function ProntuariosPage() {
       </div>
 
       <NewRecordModal
-        open={isNewRecordModalOpen}
-        onOpenChange={setIsNewRecordModalOpen}
-        onRecordCreated={() => {
-          // Aqui você pode adicionar lógica para recarregar os dados
-          console.log('Novo registro criado!')
-        }}
+        open={newRecordModalOpen}
+        onOpenChange={setNewRecordModalOpen}
+        onRecordCreated={handleRecordCreated}
+      />
+
+      <ViewRecordModal
+        open={viewRecordModalOpen}
+        onOpenChange={setViewRecordModalOpen}
+        record={selectedRecord}
+      />
+
+      <EditRecordModal
+        open={editRecordModalOpen}
+        onOpenChange={setEditRecordModalOpen}
+        record={selectedRecord}
+        onRecordUpdated={handleRecordUpdated}
       />
     </AppShell>
   )

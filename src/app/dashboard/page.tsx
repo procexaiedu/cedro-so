@@ -1,7 +1,12 @@
+'use client'
+
+import { useState, useEffect } from 'react'
 import { AppShell } from '@/components/layout/app-shell'
+import { useSupabase } from '@/providers/supabase-provider'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { Skeleton } from '@/components/ui/skeleton'
 import { 
   Calendar, 
   Users, 
@@ -9,10 +14,50 @@ import {
   TrendingUp, 
   Clock,
   UserPlus,
-  AlertCircle
+  AlertCircle,
+  Loader2
 } from 'lucide-react'
+import { 
+  type DashboardStats, 
+  type ProximaConsulta, 
+  type DashboardAlert,
+  getDashboardStats, 
+  getProximasConsultas, 
+  getDashboardAlerts,
+  formatCurrency 
+} from '@/data/dashboard'
 
 export default function DashboardPage() {
+  const { user, cedroUser } = useSupabase()
+  const [stats, setStats] = useState<DashboardStats | null>(null)
+  const [proximasConsultas, setProximasConsultas] = useState<ProximaConsulta[]>([])
+  const [alerts, setAlerts] = useState<DashboardAlert[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    if (user && cedroUser) {
+      loadDashboardData()
+    }
+  }, [user, cedroUser])
+
+  const loadDashboardData = async () => {
+    setLoading(true)
+    try {
+      const [statsData, consultasData, alertsData] = await Promise.all([
+        getDashboardStats(),
+        getProximasConsultas(),
+        getDashboardAlerts()
+      ])
+      
+      setStats(statsData)
+      setProximasConsultas(consultasData)
+      setAlerts(alertsData)
+    } catch (error) {
+      console.error('Error loading dashboard data:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
   return (
     <AppShell>
       <div className="space-y-6">
@@ -30,10 +75,18 @@ export default function DashboardPage() {
               <Calendar className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">12</div>
-              <p className="text-xs text-muted-foreground">
-                +2 desde ontem
-              </p>
+              {loading ? (
+                <Skeleton className="h-8 w-16" />
+              ) : (
+                <div className="text-2xl font-bold">{stats?.consultasHoje || 0}</div>
+              )}
+              {loading ? (
+                <Skeleton className="h-4 w-24 mt-1" />
+              ) : (
+                <p className="text-xs text-muted-foreground">
+                  {stats?.consultasHojeVariacao || 'Dados indisponíveis'}
+                </p>
+              )}
             </CardContent>
           </Card>
 
@@ -43,10 +96,18 @@ export default function DashboardPage() {
               <Users className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">248</div>
-              <p className="text-xs text-muted-foreground">
-                +12% desde o mês passado
-              </p>
+              {loading ? (
+                <Skeleton className="h-8 w-16" />
+              ) : (
+                <div className="text-2xl font-bold">{stats?.pacientesAtivos || 0}</div>
+              )}
+              {loading ? (
+                <Skeleton className="h-4 w-24 mt-1" />
+              ) : (
+                <p className="text-xs text-muted-foreground">
+                  {stats?.pacientesAtivosVariacao || 'Dados indisponíveis'}
+                </p>
+              )}
             </CardContent>
           </Card>
 
@@ -56,10 +117,18 @@ export default function DashboardPage() {
               <DollarSign className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">R$ 45.231</div>
-              <p className="text-xs text-muted-foreground">
-                +8% desde o mês passado
-              </p>
+              {loading ? (
+                <Skeleton className="h-8 w-20" />
+              ) : (
+                <div className="text-2xl font-bold">{formatCurrency(stats?.receitaMensal || 0)}</div>
+              )}
+              {loading ? (
+                <Skeleton className="h-4 w-24 mt-1" />
+              ) : (
+                <p className="text-xs text-muted-foreground">
+                  {stats?.receitaMensalVariacao || 'Dados indisponíveis'}
+                </p>
+              )}
             </CardContent>
           </Card>
 
@@ -69,10 +138,18 @@ export default function DashboardPage() {
               <TrendingUp className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">87%</div>
-              <p className="text-xs text-muted-foreground">
-                +3% desde a semana passada
-              </p>
+              {loading ? (
+                <Skeleton className="h-8 w-16" />
+              ) : (
+                <div className="text-2xl font-bold">{stats?.taxaOcupacao || 0}%</div>
+              )}
+              {loading ? (
+                <Skeleton className="h-4 w-24 mt-1" />
+              ) : (
+                <p className="text-xs text-muted-foreground">
+                  {stats?.taxaOcupacaoVariacao || 'Dados indisponíveis'}
+                </p>
+              )}
             </CardContent>
           </Card>
         </div>
@@ -87,35 +164,52 @@ export default function DashboardPage() {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {[
-                  { time: '09:00', patient: 'Maria Silva', type: 'Consulta', status: 'confirmado' },
-                  { time: '10:30', patient: 'João Santos', type: 'Retorno', status: 'pendente' },
-                  { time: '14:00', patient: 'Ana Costa', type: 'Primeira consulta', status: 'confirmado' },
-                  { time: '15:30', patient: 'Pedro Lima', type: 'Consulta', status: 'atrasado' },
-                ].map((appointment, index) => (
-                  <div key={index} className="flex items-center justify-between p-3 border rounded-lg">
-                    <div className="flex items-center space-x-3">
-                      <div className="flex items-center justify-center w-10 h-10 bg-blue-100 rounded-full">
-                        <Clock className="h-5 w-5 text-blue-600" />
+                {loading ? (
+                  Array.from({ length: 4 }).map((_, index) => (
+                    <div key={index} className="flex items-center justify-between p-3 border rounded-lg">
+                      <div className="flex items-center space-x-3">
+                        <Skeleton className="w-10 h-10 rounded-full" />
+                        <div className="space-y-2">
+                          <Skeleton className="h-4 w-24" />
+                          <Skeleton className="h-3 w-20" />
+                        </div>
                       </div>
-                      <div>
-                        <p className="font-medium">{appointment.patient}</p>
-                        <p className="text-sm text-gray-500">{appointment.type}</p>
+                      <div className="flex items-center space-x-2">
+                        <Skeleton className="h-4 w-12" />
+                        <Skeleton className="h-6 w-16" />
                       </div>
                     </div>
-                    <div className="flex items-center space-x-2">
-                      <span className="text-sm font-medium">{appointment.time}</span>
-                      <Badge 
-                        variant={
-                          appointment.status === 'confirmado' ? 'default' :
-                          appointment.status === 'pendente' ? 'secondary' : 'destructive'
-                        }
-                      >
-                        {appointment.status}
-                      </Badge>
+                  ))
+                ) : proximasConsultas.length > 0 ? (
+                  proximasConsultas.map((consulta) => (
+                    <div key={consulta.id} className="flex items-center justify-between p-3 border rounded-lg">
+                      <div className="flex items-center space-x-3">
+                        <div className="flex items-center justify-center w-10 h-10 bg-blue-100 rounded-full">
+                          <Clock className="h-5 w-5 text-blue-600" />
+                        </div>
+                        <div>
+                          <p className="font-medium">{consulta.patient}</p>
+                          <p className="text-sm text-gray-500">{consulta.type}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <span className="text-sm font-medium">{consulta.time}</span>
+                        <Badge 
+                          variant={
+                            consulta.status === 'confirmado' ? 'default' :
+                            consulta.status === 'pendente' ? 'secondary' : 'destructive'
+                          }
+                        >
+                          {consulta.status}
+                        </Badge>
+                      </div>
                     </div>
+                  ))
+                ) : (
+                  <div className="text-center py-4">
+                    <p className="text-sm text-gray-500">Nenhuma consulta agendada para hoje</p>
                   </div>
-                ))}
+                )}
               </div>
               <div className="mt-4">
                 <Button variant="outline" className="w-full">

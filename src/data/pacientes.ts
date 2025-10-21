@@ -1,4 +1,132 @@
 import { supabase } from '@/lib/supabase'
+
+// Recording Jobs Types
+export type RecordingJobStatus = 'uploaded' | 'processing' | 'completed' | 'failed' | 'completed_with_errors'
+
+export type RecordingJob = {
+  id: string
+  patient_id: string
+  therapist_id: string
+  appointment_id: string | null
+  tipo_consulta: 'anamnese' | 'evolucao'
+  status: RecordingJobStatus
+  sources_json: any[]
+  storage_url: string | null
+  transcript_raw_text: string | null
+  transcript_clean_text: string | null
+  medical_record: any | null
+  record_id: string | null
+  error_message: string | null
+  processing_started_at: string | null
+  processing_completed_at: string | null
+  created_at: string
+  updated_at: string
+  // Joined data
+  patient_name?: string
+  therapist_name?: string
+}
+
+export type PendingRecord = {
+  id: string
+  type: 'recording_job' | 'medical_record'
+  patient_id: string
+  patient_name: string
+  therapist_name: string
+  status: RecordingJobStatus | 'completed'
+  created_at: string
+  appointment_id?: string | null
+  tipo_consulta?: 'anamnese' | 'evolucao'
+  note_type?: MedicalRecordType
+  title?: string
+  content?: string
+}
+
+/**
+ * Get pending recording jobs (uploaded, processing)
+ */
+export async function getPendingRecordingJobs(): Promise<RecordingJob[]> {
+  try {
+    const { data: jobs, error } = await supabase
+      .schema('cedro')
+      .from('recording_jobs')
+      .select(`
+        *,
+        patients!inner(full_name),
+        users!recording_jobs_therapist_id_fkey(name)
+      `)
+      .in('status', ['uploaded', 'processing'])
+      .order('created_at', { ascending: false })
+
+    if (error) {
+      console.error('Error fetching pending recording jobs:', error)
+      throw new Error('Erro ao buscar jobs de gravação pendentes')
+    }
+
+    return jobs?.map(job => ({
+      ...job,
+      patient_name: (job as any).patients?.full_name,
+      therapist_name: (job as any).users?.name
+    })) || []
+  } catch (error) {
+    console.error('Error in getPendingRecordingJobs:', error)
+    throw error
+  }
+}
+
+/**
+ * Get all records (medical records + pending recording jobs) combined
+ */
+export async function getAllRecords(): Promise<PendingRecord[]> {
+  try {
+    const [medicalRecords, pendingJobs] = await Promise.all([
+      getMedicalRecords(),
+      getPendingRecordingJobs()
+    ])
+
+    const combinedRecords: PendingRecord[] = []
+
+    // Add completed medical records
+    medicalRecords.forEach(record => {
+      combinedRecords.push({
+        id: record.id,
+        type: 'medical_record',
+        patient_id: record.patient_id,
+        patient_name: record.patient_name || 'Paciente não encontrado',
+        therapist_name: record.therapist_name || 'Terapeuta não encontrado',
+        status: 'completed',
+        created_at: record.created_at,
+        appointment_id: record.appointment_id,
+        note_type: record.note_type,
+        title: record.title,
+        content: record.content
+      })
+    })
+
+    // Add pending recording jobs
+    pendingJobs.forEach(job => {
+      combinedRecords.push({
+        id: job.id,
+        type: 'recording_job',
+        patient_id: job.patient_id,
+        patient_name: job.patient_name || 'Paciente não encontrado',
+        therapist_name: job.therapist_name || 'Terapeuta não encontrado',
+        status: job.status,
+        created_at: job.created_at,
+        appointment_id: job.appointment_id,
+        tipo_consulta: job.tipo_consulta
+      })
+    })
+
+    // Sort by creation date (newest first)
+    combinedRecords.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+
+    return combinedRecords
+  } catch (error) {
+    console.error('Error in getAllRecords:', error)
+    throw error
+  }
+}
+
 import { format } from 'date-fns'
 
 export type PatientStatus = 'active' | 'inactive' | 'suspended'
@@ -528,7 +656,7 @@ export function getStatusText(status: PatientStatus): string {
 
 // Medical Records Types and Functions
 export type MedicalRecordType = 'anamnesis' | 'soap' | 'evolution' | 'prescription_draft'
-export type MedicalRecordVisibility = 'private' | 'team'
+export type MedicalRecordVisibility = 'private' | 'shared'
 
 export type MedicalRecord = {
   id: string
@@ -556,9 +684,18 @@ export type CreateMedicalRecordData = {
   audio_url?: string
 }
 
-export async function createMedicalRecord(data: CreateMedicalRecordData): Promise<MedicalRecord> {
+export type UpdateMedicalRecordData = {
+  note_type?: MedicalRecordType
+  content_json?: any
+  visibility?: 'private' | 'shared'
+  signed_by?: string
+  signed_at?: string
+}
+
+export async function createMedicalRecord(data: CreateMedicalRecordData): Promise<MedicalRecordWithLegacyFields> {
   try {
     const { data: record, error } = await supabase
+      .schema('cedro')
       .from('medical_records')
       .insert({
         patient_id: data.patient_id,
@@ -571,8 +708,8 @@ export async function createMedicalRecord(data: CreateMedicalRecordData): Promis
         *,
         patients!inner(full_name),
         appointments(
-          appointment_date,
-          users!appointments_therapist_id_fkey(full_name)
+          start_at,
+          users!appointments_therapist_id_fkey(name)
         )
       `)
       .single()
@@ -582,28 +719,68 @@ export async function createMedicalRecord(data: CreateMedicalRecordData): Promis
       throw new Error('Erro ao criar registro médico')
     }
 
-    return {
+    const baseRecord = {
       ...record,
-      patient_name: record.patients?.full_name,
-      therapist_name: record.appointments?.users?.full_name,
-      appointment_date: record.appointments?.appointment_date
+      patient_name: (record as any).patients?.full_name,
+      therapist_name: (record as any).appointments?.users?.name,
+      appointment_date: (record as any).appointments?.start_at
     }
+
+    return addLegacyFields(baseRecord)
   } catch (error) {
     console.error('Error in createMedicalRecord:', error)
     throw error
   }
 }
 
-export async function getMedicalRecords(patientId?: string): Promise<MedicalRecord[]> {
+export async function getMedicalRecord(id: string): Promise<MedicalRecordWithLegacyFields | null> {
   try {
-    let query = supabase
+    const { data, error } = await supabase
+      .schema('cedro')
       .from('medical_records')
       .select(`
         *,
         patients!inner(full_name),
         appointments(
-          appointment_date,
-          users!appointments_therapist_id_fkey(full_name)
+          start_at,
+          users!appointments_therapist_id_fkey(name)
+        )
+      `)
+      .eq('id', id)
+      .single()
+
+    if (error) {
+      console.error('Error fetching medical record:', error)
+      throw error
+    }
+
+    if (!data) return null
+
+    const baseRecord = {
+      ...data,
+      patient_name: (data as any).patients?.full_name || 'Paciente não encontrado',
+      therapist_name: (data as any).appointments?.users?.name || 'Terapeuta não encontrado',
+      appointment_date: (data as any).appointments?.start_at || null
+    }
+
+    return addLegacyFields(baseRecord)
+  } catch (error) {
+    console.error('Error in getMedicalRecord:', error)
+    throw error
+  }
+}
+
+export async function getMedicalRecords(patientId?: string): Promise<MedicalRecordWithLegacyFields[]> {
+  try {
+    let query = supabase
+      .schema('cedro')
+      .from('medical_records')
+      .select(`
+        *,
+        patients!inner(full_name),
+        appointments(
+          start_at,
+          users!appointments_therapist_id_fkey(name)
         )
       `)
       .order('created_at', { ascending: false })
@@ -619,50 +796,57 @@ export async function getMedicalRecords(patientId?: string): Promise<MedicalReco
       throw new Error('Erro ao buscar registros médicos')
     }
 
-    return records?.map(record => ({
-      ...record,
-      patient_name: record.patients?.full_name,
-      therapist_name: record.appointments?.users?.full_name,
-      appointment_date: record.appointments?.appointment_date
-    })) || []
+    return records?.map(record => {
+      const baseRecord = {
+        ...record,
+        patient_name: (record as any).patients?.full_name,
+        therapist_name: (record as any).appointments?.users?.name,
+        appointment_date: (record as any).appointments?.start_at
+      }
+      return addLegacyFields(baseRecord)
+    }) || []
   } catch (error) {
     console.error('Error in getMedicalRecords:', error)
     throw error
   }
 }
 
-export async function updateMedicalRecord(id: string, data: Partial<CreateMedicalRecordData>): Promise<MedicalRecord> {
+export async function updateMedicalRecord(id: string, updates: {
+  note_type?: MedicalRecordType
+  content_json?: any
+  visibility?: 'private' | 'shared'
+  signed_by?: string
+  signed_at?: string
+}): Promise<MedicalRecordWithLegacyFields> {
   try {
-    const { data: record, error } = await supabase
+    const { data, error } = await supabase
+      .schema('cedro')
       .from('medical_records')
-      .update({
-        note_type: data.note_type,
-        content_json: data.content_json,
-        visibility: data.visibility,
-        updated_at: new Date().toISOString()
-      })
+      .update(updates)
       .eq('id', id)
       .select(`
         *,
         patients!inner(full_name),
         appointments(
-          appointment_date,
-          users!appointments_therapist_id_fkey(full_name)
+          start_at,
+          users!appointments_therapist_id_fkey(name)
         )
       `)
       .single()
 
     if (error) {
       console.error('Error updating medical record:', error)
-      throw new Error('Erro ao atualizar registro médico')
+      throw error
     }
 
-    return {
-      ...record,
-      patient_name: record.patients?.full_name,
-      therapist_name: record.appointments?.users?.full_name,
-      appointment_date: record.appointments?.appointment_date
+    const baseRecord = {
+      ...data,
+      patient_name: (data as any).patients?.full_name || 'Paciente não encontrado',
+      therapist_name: (data as any).appointments?.users?.name || 'Terapeuta não encontrado',
+      appointment_date: (data as any).appointments?.start_at || null
     }
+
+    return addLegacyFields(baseRecord)
   } catch (error) {
     console.error('Error in updateMedicalRecord:', error)
     throw error
@@ -672,6 +856,7 @@ export async function updateMedicalRecord(id: string, data: Partial<CreateMedica
 export async function deleteMedicalRecord(id: string): Promise<void> {
   try {
     const { error } = await supabase
+      .schema('cedro')
       .from('medical_records')
       .delete()
       .eq('id', id)
@@ -698,5 +883,175 @@ export function getMedicalRecordTypeLabel(type: MedicalRecordType): string {
       return 'Prescrição'
     default:
       return 'Desconhecido'
+  }
+}
+
+// Helper functions for backward compatibility and content extraction
+export function getMedicalRecordContent(record: MedicalRecord): string {
+  if (!record.content_json) return ''
+  
+  // If it's a structured record with content
+  if (record.content_json.conteudo) {
+    const content = record.content_json.conteudo
+    // Extract text from SOAP structure
+    if (content.subjetivo || content.objetivo || content.avaliacao || content.plano) {
+      const parts: string[] = []
+      if (content.subjetivo?.queixa_principal) parts.push(`Queixa: ${content.subjetivo.queixa_principal}`)
+      if (content.subjetivo?.historia_doenca_atual) parts.push(`História: ${content.subjetivo.historia_doenca_atual}`)
+      if (content.avaliacao?.impressao_clinica) parts.push(`Avaliação: ${content.avaliacao.impressao_clinica}`)
+      if (content.plano?.proximos_passos?.length) parts.push(`Plano: ${content.plano.proximos_passos.join(', ')}`)
+      return parts.join('\n\n')
+    }
+  }
+  
+  // If it's a simple text content
+  if (typeof record.content_json === 'string') {
+    return record.content_json
+  }
+  
+  // If it has a content property
+  if (record.content_json.content) {
+    return record.content_json.content
+  }
+  
+  // If it has raw_transcript
+  if (record.content_json.raw_transcript) {
+    return record.content_json.raw_transcript
+  }
+  
+  return JSON.stringify(record.content_json, null, 2)
+}
+
+export function getMedicalRecordTranscription(record: MedicalRecord): string | null {
+  if (!record.content_json) return null
+  
+  // Check for raw transcript
+  if (record.content_json.raw_transcript) {
+    return record.content_json.raw_transcript
+  }
+  
+  // Check for transcription field
+  if (record.content_json.transcription) {
+    return record.content_json.transcription
+  }
+  
+  return null
+}
+
+export function getMedicalRecordAudioUrl(record: MedicalRecord): string | null {
+  if (!record.content_json) return null
+  
+  // Check for audio_url field
+  if (record.content_json.audio_url) {
+    return record.content_json.audio_url
+  }
+  
+  return null
+}
+
+// Extended type for backward compatibility
+export type MedicalRecordWithLegacyFields = MedicalRecord & {
+  type?: MedicalRecordType
+  content?: string
+  transcription?: string | null
+  audio_url?: string | null
+}
+
+export function addLegacyFields(record: MedicalRecord): MedicalRecordWithLegacyFields {
+  return {
+    ...record,
+    type: record.note_type,
+    content: getMedicalRecordContent(record),
+    transcription: getMedicalRecordTranscription(record),
+    audio_url: getMedicalRecordAudioUrl(record)
+  }
+}
+
+export type MedicalRecordStats = {
+  total_records: number
+  active_patients: number
+  records_today: number
+  medical_alerts: number
+  recent_records: MedicalRecord[]
+}
+
+export async function getMedicalRecordStats(): Promise<MedicalRecordStats> {
+  try {
+    // Get total records count
+    const { count: totalRecords, error: totalError } = await supabase
+      .schema('cedro')
+      .from('medical_records')
+      .select('*', { count: 'exact', head: true })
+
+    if (totalError) {
+      console.error('Error fetching total records:', totalError)
+    }
+
+    // Get active patients count
+    const { count: activePatients, error: activePatientsError } = await supabase
+      .schema('cedro')
+      .from('patients')
+      .select('*', { count: 'exact', head: true })
+      .eq('is_on_hold', false)
+
+    if (activePatientsError) {
+      console.error('Error fetching active patients:', activePatientsError)
+    }
+
+    // Get records created today
+    const today = new Date().toISOString().split('T')[0]
+    const { count: recordsToday, error: todayError } = await supabase
+      .schema('cedro')
+      .from('medical_records')
+      .select('*', { count: 'exact', head: true })
+      .gte('created_at', `${today}T00:00:00.000Z`)
+      .lt('created_at', `${today}T23:59:59.999Z`)
+
+    if (todayError) {
+      console.error('Error fetching today records:', todayError)
+    }
+
+    // Get recent records (last 10)
+    const { data: recentRecords, error: recentError } = await supabase
+      .schema('cedro')
+      .from('medical_records')
+      .select(`
+        *,
+        patients!inner(full_name),
+        appointments(
+          start_at,
+          users!appointments_therapist_id_fkey(name)
+        )
+      `)
+      .order('created_at', { ascending: false })
+      .limit(10)
+
+    if (recentError) {
+      console.error('Error fetching recent records:', recentError)
+    }
+
+    const formattedRecentRecords = recentRecords?.map(record => ({
+      ...record,
+      patient_name: (record as any).patients?.full_name,
+      therapist_name: (record as any).appointments?.users?.name,
+      appointment_date: (record as any).appointments?.start_at
+    })) || []
+
+    return {
+      total_records: totalRecords || 0,
+      active_patients: activePatients || 0,
+      records_today: recordsToday || 0,
+      medical_alerts: 0, // TODO: Implement medical alerts logic
+      recent_records: formattedRecentRecords
+    }
+  } catch (error) {
+    console.error('Error in getMedicalRecordStats:', error)
+    return {
+      total_records: 0,
+      active_patients: 0,
+      records_today: 0,
+      medical_alerts: 0,
+      recent_records: []
+    }
   }
 }
