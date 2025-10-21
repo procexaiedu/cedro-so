@@ -17,52 +17,65 @@ import {
 } from 'lucide-react'
 import { useSupabase } from '@/providers/supabase-provider'
 
-const navigation = [
+const allNavigation = [
   {
     name: 'Dashboard',
     href: '/dashboard',
     icon: LayoutDashboard,
+    roles: ['admin', 'therapist'],
   },
   {
     name: 'Agenda',
     href: '/agenda',
     icon: Calendar,
+    roles: ['admin', 'therapist'],
   },
   {
     name: 'Disponibilidade',
     href: '/disponibilidade',
     icon: Clock,
+    roles: ['admin', 'therapist'],
   },
   {
     name: 'Pacientes',
     href: '/pacientes',
     icon: Users,
+    roles: ['admin', 'therapist'],
   },
   {
     name: 'Conversas',
     href: '/conversas',
     icon: MessageSquare,
+    roles: ['admin'], // Apenas para admins
   },
   {
     name: 'Financeiro',
     href: '/financeiro',
     icon: DollarSign,
+    roles: ['admin', 'therapist'],
   },
   {
     name: 'CRM',
     href: '/crm',
     icon: UserPlus,
+    roles: ['admin'], // Apenas para admins
   },
   {
     name: 'Prontuários',
     href: '/prontuarios',
     icon: FileText,
+    roles: ['admin', 'therapist'],
   },
 ]
 
 export function Sidebar() {
   const pathname = usePathname()
-  const { signOut, user } = useSupabase()
+  const { signOut, user, cedroUser } = useSupabase()
+
+  // Filtrar navegação baseado no role do usuário
+  const navigation = allNavigation.filter(item => 
+    cedroUser?.role ? item.roles.includes(cedroUser.role) : true
+  )
 
   return (
     <div className="flex h-full w-64 flex-col bg-gray-50 border-r">
@@ -99,15 +112,16 @@ export function Sidebar() {
       </nav>
 
       {/* User section */}
-      {user && (
+      {user && cedroUser && (
         <div className="border-t p-4">
           <div className="flex items-center mb-3">
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium text-gray-900 truncate">
-                {user.email}
+                {cedroUser.name}
               </p>
               <p className="text-xs text-gray-500 truncate">
-                {user.user_metadata?.role || 'Usuário'}
+                {cedroUser.role === 'admin' ? 'Administrador' : 
+                 cedroUser.role === 'therapist' ? 'Terapeuta' : 'Usuário'}
               </p>
             </div>
           </div>

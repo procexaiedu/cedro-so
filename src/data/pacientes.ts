@@ -32,6 +32,7 @@ export type PendingRecord = {
   patient_id: string
   patient_name: string
   therapist_name: string
+  therapist_id: string
   status: RecordingJobStatus | 'completed'
   created_at: string
   appointment_id?: string | null
@@ -44,9 +45,9 @@ export type PendingRecord = {
 /**
  * Get pending recording jobs (uploaded, processing)
  */
-export async function getPendingRecordingJobs(): Promise<RecordingJob[]> {
+export async function getPendingRecordingJobs(therapistId?: string): Promise<RecordingJob[]> {
   try {
-    const { data: jobs, error } = await supabase
+    let query = supabase
       .schema('cedro')
       .from('recording_jobs')
       .select(`
@@ -56,6 +57,12 @@ export async function getPendingRecordingJobs(): Promise<RecordingJob[]> {
       `)
       .in('status', ['uploaded', 'processing'])
       .order('created_at', { ascending: false })
+
+    if (therapistId) {
+      query = query.eq('therapist_id', therapistId)
+    }
+
+    const { data: jobs, error } = await query
 
     if (error) {
       console.error('Error fetching pending recording jobs:', error)
@@ -76,29 +83,31 @@ export async function getPendingRecordingJobs(): Promise<RecordingJob[]> {
 /**
  * Get all records (medical records + pending recording jobs) combined
  */
-export async function getAllRecords(): Promise<PendingRecord[]> {
+export async function getAllRecords(therapistId?: string): Promise<PendingRecord[]> {
   try {
     const [medicalRecords, pendingJobs] = await Promise.all([
-      getMedicalRecords(),
-      getPendingRecordingJobs()
+      getMedicalRecords(therapistId),
+      getPendingRecordingJobs(therapistId)
     ])
 
     const combinedRecords: PendingRecord[] = []
 
     // Add completed medical records
     medicalRecords.forEach(record => {
+      const recordWithLegacyFields = addLegacyFields(record)
       combinedRecords.push({
         id: record.id,
         type: 'medical_record',
         patient_id: record.patient_id,
         patient_name: record.patient_name || 'Paciente não encontrado',
         therapist_name: record.therapist_name || 'Terapeuta não encontrado',
+        therapist_id: record.therapist_id || '',
         status: 'completed',
         created_at: record.created_at,
         appointment_id: record.appointment_id,
         note_type: record.note_type,
-        title: record.title,
-        content: record.content
+        title: recordWithLegacyFields.title,
+        content: recordWithLegacyFields.content
       })
     })
 
@@ -110,6 +119,7 @@ export async function getAllRecords(): Promise<PendingRecord[]> {
         patient_id: job.patient_id,
         patient_name: job.patient_name || 'Paciente não encontrado',
         therapist_name: job.therapist_name || 'Terapeuta não encontrado',
+        therapist_id: job.therapist_id,
         status: job.status,
         created_at: job.created_at,
         appointment_id: job.appointment_id,
@@ -226,13 +236,34 @@ export type UpdatePatientData = Partial<CreatePatientData>
  */
 export async function getPatients(
   filters: PatientFilters = {},
-  pagination: PaginationParams = { page: 1, limit: 10 }
+  pagination: PaginationParams = { page: 1, limit: 10 },
+  therapistId?: string
 ): Promise<PatientListResponse> {
   try {
     let query = supabase
       .schema('cedro')
       .from('patients')
       .select('*', { count: 'exact' })
+
+    // If therapistId is provided, filter by linked patients only
+    if (therapistId) {
+      // First get the patient IDs for this therapist
+      const { data: linkedPatients } = await supabase
+        .schema('cedro')
+        .from('patient_therapist_links')
+        .select('patient_id')
+        .eq('therapist_id', therapistId)
+        .eq('status', 'active')
+      
+      const patientIds = linkedPatients?.map(link => link.patient_id) || []
+      
+      if (patientIds.length > 0) {
+        query = query.in('id', patientIds)
+      } else {
+        // If no linked patients, return empty result
+        query = query.eq('id', 'no-patients-found')
+      }
+    }
 
     // Apply filters
     if (filters.search) {
@@ -580,7 +611,7 @@ export async function getTherapistsForFilter(): Promise<Array<{ id: string; name
       .schema('cedro')
       .from('users')
       .select('id, name')
-      .eq('role', 'therapist')
+      .in('role', ['therapist', 'admin'])
       .order('name', { ascending: true })
 
     if (error) {
@@ -672,6 +703,7 @@ export type MedicalRecord = {
   // Joined data
   patient_name?: string
   therapist_name?: string
+  therapist_id?: string
   appointment_date?: string
 }
 
@@ -770,7 +802,7 @@ export async function getMedicalRecord(id: string): Promise<MedicalRecordWithLeg
   }
 }
 
-export async function getMedicalRecords(patientId?: string): Promise<MedicalRecordWithLegacyFields[]> {
+export async function getMedicalRecords(patientId?: string, therapistId?: string): Promise<MedicalRecordWithLegacyFields[]> {
   try {
     let query = supabase
       .schema('cedro')
@@ -780,6 +812,7 @@ export async function getMedicalRecords(patientId?: string): Promise<MedicalReco
         patients!inner(full_name),
         appointments(
           start_at,
+          therapist_id,
           users!appointments_therapist_id_fkey(name)
         )
       `)
@@ -787,6 +820,10 @@ export async function getMedicalRecords(patientId?: string): Promise<MedicalReco
 
     if (patientId) {
       query = query.eq('patient_id', patientId)
+    }
+
+    if (therapistId) {
+      query = query.eq('appointments.therapist_id', therapistId)
     }
 
     const { data: records, error } = await query
@@ -801,6 +838,7 @@ export async function getMedicalRecords(patientId?: string): Promise<MedicalReco
         ...record,
         patient_name: (record as any).patients?.full_name,
         therapist_name: (record as any).appointments?.users?.name,
+        therapist_id: (record as any).appointments?.therapist_id,
         appointment_date: (record as any).appointments?.start_at
       }
       return addLegacyFields(baseRecord)
@@ -949,9 +987,24 @@ export function getMedicalRecordAudioUrl(record: MedicalRecord): string | null {
   return null
 }
 
+export function getMedicalRecordTitle(record: MedicalRecord): string | undefined {
+  if (!record.content_json) return undefined
+  
+  // Check for title field
+  if (record.content_json.title) {
+    return record.content_json.title
+  }
+  
+  // Generate title based on note type and date
+  const date = new Date(record.created_at).toLocaleDateString('pt-BR')
+  const typeLabel = getMedicalRecordTypeLabel(record.note_type)
+  return `${typeLabel} - ${date}`
+}
+
 // Extended type for backward compatibility
 export type MedicalRecordWithLegacyFields = MedicalRecord & {
   type?: MedicalRecordType
+  title?: string
   content?: string
   transcription?: string | null
   audio_url?: string | null
@@ -961,6 +1014,7 @@ export function addLegacyFields(record: MedicalRecord): MedicalRecordWithLegacyF
   return {
     ...record,
     type: record.note_type,
+    title: getMedicalRecordTitle(record),
     content: getMedicalRecordContent(record),
     transcription: getMedicalRecordTranscription(record),
     audio_url: getMedicalRecordAudioUrl(record)

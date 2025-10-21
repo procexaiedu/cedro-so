@@ -19,6 +19,7 @@ import {
   DollarSign
 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
+import { useSupabase } from '@/providers/supabase-provider'
 import { 
   getInvoices, 
   getTherapistsForFilter,
@@ -44,6 +45,7 @@ const statusOptions: { value: InvoiceStatus | 'todos'; label: string }[] = [
 
 export default function FinanceiroPage() {
   const { toast } = useToast()
+  const { user, cedroUser } = useSupabase()
   const [invoices, setInvoices] = useState<Invoice[]>([])
   const [therapists, setTherapists] = useState<Array<{ id: string; name: string }>>([])
   const [loading, setLoading] = useState(true)
@@ -84,7 +86,12 @@ export default function FinanceiroPage() {
   const loadInvoices = async () => {
     setLoading(true)
     try {
-      const response = await getInvoices(filters, { page: currentPage, limit })
+      // Apenas terapeutas têm filtro automático - administradores veem todos os dados
+      const finalFilters = cedroUser?.role === 'therapist' 
+        ? { ...filters, therapistId: cedroUser.id }
+        : filters
+        
+      const response = await getInvoices(finalFilters, { page: currentPage, limit })
       setInvoices(response.data)
       setTotalPages(response.totalPages)
       setTotal(response.total)
@@ -182,26 +189,28 @@ export default function FinanceiroPage() {
                 />
               </div>
 
-              {/* Terapeuta */}
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Terapeuta</label>
-                <Select
-                  value={filters.therapistId || 'todos'}
-                  onValueChange={(value) => handleFilterChange('therapistId', value === 'todos' ? undefined : value)}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Todos os terapeutas" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="todos">Todos os terapeutas</SelectItem>
-                    {therapists.map((therapist) => (
-                      <SelectItem key={therapist.id} value={therapist.id}>
-                        {therapist.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+              {/* Terapeuta - apenas para administradores */}
+              {cedroUser?.role === 'admin' && (
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Terapeuta</label>
+                  <Select
+                    value={filters.therapistId || 'todos'}
+                    onValueChange={(value) => handleFilterChange('therapistId', value === 'todos' ? undefined : value)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Todos os terapeutas" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="todos">Todos os terapeutas</SelectItem>
+                      {therapists.map((therapist) => (
+                        <SelectItem key={therapist.id} value={therapist.id}>
+                          {therapist.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
 
               {/* Busca por paciente */}
               <div className="space-y-2">

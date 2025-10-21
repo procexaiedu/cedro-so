@@ -33,8 +33,10 @@ import {
 import { PatientDetailDrawer } from '@/components/pacientes/patient-detail-drawer'
 import { PatientForm } from '@/components/pacientes/patient-form'
 import { PatientDeleteDialog } from '@/components/pacientes/patient-delete-dialog'
+import { useSupabase } from '@/providers/supabase-provider'
 
 export default function PacientesPage() {
+  const { cedroUser } = useSupabase()
   const [patients, setPatients] = useState<Patient[]>([])
   const [therapists, setTherapists] = useState<Array<{ id: string; name: string }>>([])
   const [loading, setLoading] = useState(true)
@@ -63,7 +65,9 @@ export default function PacientesPage() {
   const loadPatients = async () => {
     setLoading(true)
     try {
-      const response = await getPatients(filters, { page: currentPage, limit })
+      // Apenas terapeutas têm filtro automático - administradores veem todos os dados
+      const therapistId = cedroUser?.role === 'therapist' ? cedroUser.id : undefined
+      const response = await getPatients(filters, { page: currentPage, limit }, therapistId)
       setPatients(response.data)
       setTotal(response.total)
       setTotalPages(response.totalPages)

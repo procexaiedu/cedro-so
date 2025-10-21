@@ -297,7 +297,7 @@ export async function createScheduleException(exception: {
 }
 
 /**
- * Get all therapists (users with role 'therapist')
+ * Get all therapists (users with role 'therapist' or admin users who can also act as therapists)
  */
 export async function getTherapists(): Promise<Array<{ id: string; name: string; email: string }>> {
   try {
@@ -305,7 +305,7 @@ export async function getTherapists(): Promise<Array<{ id: string; name: string;
       .schema('cedro')
       .from('users')
       .select('id, name, email')
-      .eq('role', 'therapist')
+      .in('role', ['therapist', 'admin'])
       .order('name', { ascending: true })
 
     if (error) {

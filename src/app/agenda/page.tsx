@@ -24,6 +24,7 @@ import {
   MoreHorizontal
 } from 'lucide-react'
 import { Input } from '@/components/ui/input'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useSupabase } from '@/providers/supabase-provider'
 import { 
   getAppointments, 
@@ -83,7 +84,10 @@ export default function AgendaPage() {
       setLoading(true)
       const { startDate, endDate } = getDateRange()
       console.log('🔍 Loading appointments for date range:', { startDate, endDate, currentDate, viewMode })
-      const appointmentsData = await getAppointments(new Date(startDate), new Date(endDate))
+      
+      // Apenas terapeutas têm filtro automático - administradores veem todos os dados
+      const therapistId = cedroUser?.role === 'therapist' ? cedroUser.id : undefined
+      const appointmentsData = await getAppointments(new Date(startDate), new Date(endDate), therapistId)
       console.log('📅 Appointments loaded:', appointmentsData)
       setAppointments(appointmentsData)
     } catch (error) {
@@ -96,7 +100,7 @@ export default function AgendaPage() {
     } finally {
       setLoading(false)
     }
-  }, [currentDate, viewMode])
+  }, [currentDate, viewMode, cedroUser])
 
   const loadLookupData = async () => {
     try {
@@ -455,6 +459,25 @@ export default function AgendaPage() {
                   />
                 </div>
               </div>
+              {/* Filtro por terapeuta - apenas para administradores */}
+              {cedroUser?.role === 'admin' && (
+                <Select 
+                  value={selectedTherapist || 'todos'} 
+                  onValueChange={(value) => setSelectedTherapist(value === 'todos' ? '' : value)}
+                >
+                  <SelectTrigger className="w-[200px]">
+                    <SelectValue placeholder="Terapeuta" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="todos">Todos os Terapeutas</SelectItem>
+                    {therapists.map(therapist => (
+                      <SelectItem key={therapist.id} value={therapist.id}>
+                        {therapist.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
               <Button 
                 variant="outline"
                 onClick={() => setCurrentDate(new Date())}

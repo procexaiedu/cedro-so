@@ -215,7 +215,7 @@ export async function getTherapistsForFilter(): Promise<Array<{ id: string; name
     .schema('cedro')
     .from('users')
     .select('id, name')
-    .eq('role', 'therapist')
+    .in('role', ['therapist', 'admin'])
     .eq('is_active', true)
     .order('name')
 

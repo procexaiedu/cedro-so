@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import {
   Table,
@@ -41,6 +42,7 @@ import {
   getMedicalRecordStats, 
   getMedicalRecordTypeLabel, 
   getAllRecords,
+  getTherapistsForFilter,
   type MedicalRecordWithLegacyFields, 
   type MedicalRecordStats,
   type PendingRecord 
@@ -56,18 +58,25 @@ export default function ProntuariosPage() {
   const [stats, setStats] = useState<MedicalRecordStats | null>(null)
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
+  const [therapists, setTherapists] = useState<Array<{ id: string; name: string }>>([])
+  const [selectedTherapist, setSelectedTherapist] = useState<string>('')
 
   useEffect(() => {
     if (user && cedroUser) {
       loadData()
+      loadTherapists()
     }
   }, [user, cedroUser])
 
   const loadData = async () => {
     try {
       setLoading(true)
+      
+      // Apenas terapeutas têm filtro automático - administradores veem todos os dados
+      const therapistId = cedroUser?.role === 'therapist' ? cedroUser.id : undefined
+      
       const [recordsData, statsData] = await Promise.all([
-        getAllRecords(),
+        getAllRecords(therapistId),
         getMedicalRecordStats()
       ])
       
@@ -80,17 +89,33 @@ export default function ProntuariosPage() {
     }
   }
 
+  const loadTherapists = async () => {
+    try {
+      const therapistsData = await getTherapistsForFilter()
+      setTherapists(therapistsData)
+    } catch (error) {
+      console.error('Error loading therapists:', error)
+    }
+  }
+
   const filteredRecords = records.filter(record => {
-    if (!searchTerm) return true
-    const searchLower = searchTerm.toLowerCase()
-    return (
-      record.patient_name?.toLowerCase().includes(searchLower) ||
-      record.therapist_name?.toLowerCase().includes(searchLower) ||
-      (record.note_type && getMedicalRecordTypeLabel(record.note_type).toLowerCase().includes(searchLower)) ||
-      (record.tipo_consulta && record.tipo_consulta.toLowerCase().includes(searchLower)) ||
-      record.content?.toLowerCase().includes(searchLower) ||
-      record.title?.toLowerCase().includes(searchLower)
-    )
+    // Filtro por busca
+    const matchesSearch = !searchTerm || (() => {
+      const searchLower = searchTerm.toLowerCase()
+      return (
+        record.patient_name?.toLowerCase().includes(searchLower) ||
+        record.therapist_name?.toLowerCase().includes(searchLower) ||
+        (record.note_type && getMedicalRecordTypeLabel(record.note_type).toLowerCase().includes(searchLower)) ||
+        (record.tipo_consulta && record.tipo_consulta.toLowerCase().includes(searchLower)) ||
+        record.content?.toLowerCase().includes(searchLower) ||
+        record.title?.toLowerCase().includes(searchLower)
+      )
+    })()
+
+    // Filtro por terapeuta (apenas para administradores)
+    const matchesTherapist = !selectedTherapist || record.therapist_id === selectedTherapist
+
+    return matchesSearch && matchesTherapist
   })
 
   const getStatusColor = (visibility: string) => {
@@ -464,6 +489,25 @@ ${transcription ? `\nTranscrição: ${transcription}` : ''}
                       />
                     </div>
                   </div>
+                  {/* Filtro por terapeuta - apenas para administradores */}
+                  {cedroUser?.role === 'admin' && (
+                    <Select 
+                      value={selectedTherapist || 'todos'} 
+                      onValueChange={(value) => setSelectedTherapist(value === 'todos' ? '' : value)}
+                    >
+                      <SelectTrigger className="w-[200px]">
+                        <SelectValue placeholder="Terapeuta" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="todos">Todos os Terapeutas</SelectItem>
+                        {therapists.map(therapist => (
+                          <SelectItem key={therapist.id} value={therapist.id}>
+                            {therapist.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
                   <Button variant="outline">
                     <Filter className="mr-2 h-4 w-4" />
                     Filtros

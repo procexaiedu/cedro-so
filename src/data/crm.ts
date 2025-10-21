@@ -642,7 +642,7 @@ export async function getTherapistsForAssignment(): Promise<Array<{ id: string; 
       .schema('cedro')
       .from('users')
       .select('id, name')
-      .eq('role', 'therapist')
+      .in('role', ['therapist', 'admin'])
       .eq('is_active', true)
 
     return therapists || []
