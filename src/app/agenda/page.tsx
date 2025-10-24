@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, memo, useCallback } from 'react'
 import { AppShell } from '@/components/layout/app-shell'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -27,16 +27,19 @@ import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useSupabase } from '@/providers/supabase-provider'
 import { 
-  getAppointments, 
-  getTherapists, 
-  getPatients, 
-  getServices,
+  useAppointments, 
+  useTherapists, 
+  usePatientsForAppointments, 
+  useServices,
   type Appointment 
-} from '@/data/agenda'
+} from '@/hooks/use-appointments'
+import { useDebounce } from '@/hooks/use-debounce'
+import { AppointmentListSkeleton } from '@/components/skeletons/appointment-skeleton'
 import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, addDays, addWeeks, addMonths, subDays, subWeeks, subMonths, isSameDay, parseISO } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { useToast } from '@/hooks/use-toast'
-import { AppointmentModal } from '@/components/agenda/appointment-modal'
+import { Suspense } from 'react'
+import { LazyAppointmentModal } from '@/components/lazy'
 
 type ViewMode = 'day' | 'week' | 'month'
 
@@ -46,11 +49,6 @@ export default function AgendaPage() {
   const [viewMode, setViewMode] = useState<ViewMode>('week')
   const [currentDate, setCurrentDate] = useState(new Date())
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date())
-  const [appointments, setAppointments] = useState<Appointment[]>([])
-  const [therapists, setTherapists] = useState<any[]>([])
-  const [patients, setPatients] = useState<any[]>([])
-  const [services, setServices] = useState<any[]>([])
-  const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedTherapist, setSelectedTherapist] = useState<string>('')
   const [isNewAppointmentOpen, setIsNewAppointmentOpen] = useState(false)
@@ -58,6 +56,9 @@ export default function AgendaPage() {
   const [modalMode, setModalMode] = useState<'create' | 'edit' | 'view'>('create')
   const [defaultDate, setDefaultDate] = useState<Date | undefined>(undefined)
   const [defaultTime, setDefaultTime] = useState<string | undefined>(undefined)
+
+  // Debounce search term
+  const debouncedSearchTerm = useDebounce(searchTerm, 300)
 
   const getDateRange = () => {
     switch (viewMode) {
@@ -79,86 +80,52 @@ export default function AgendaPage() {
     }
   }
 
-  const loadData = useCallback(async () => {
-    try {
-      setLoading(true)
-      const { startDate, endDate } = getDateRange()
-      console.log('🔍 Loading appointments for date range:', { startDate, endDate, currentDate, viewMode })
-      
-      // Apenas terapeutas têm filtro automático - administradores veem todos os dados
-      const therapistId = cedroUser?.role === 'therapist' ? cedroUser.id : undefined
-      const appointmentsData = await getAppointments(new Date(startDate), new Date(endDate), therapistId)
-      console.log('📅 Appointments loaded:', appointmentsData)
-      setAppointments(appointmentsData)
-    } catch (error) {
-      console.error('Error loading appointments:', error)
-      toast({
-        title: "Erro",
-        description: "Não foi possível carregar os agendamentos",
-        variant: "destructive"
-      })
-    } finally {
-      setLoading(false)
-    }
-  }, [currentDate, viewMode, cedroUser])
+  // React Query hooks
+  const { startDate, endDate } = getDateRange()
+  const therapistId = cedroUser?.role === 'therapist' ? cedroUser.id : undefined
+  
+  const { data: appointments = [], isLoading: appointmentsLoading } = useAppointments(
+    new Date(startDate),
+    new Date(endDate),
+    therapistId
+  )
+  
+  const { data: therapists = [] } = useTherapists()
+  const { data: patients = [] } = usePatientsForAppointments()
+  const { data: services = [] } = useServices()
+  
+  const loading = appointmentsLoading
 
-  const loadLookupData = async () => {
-    try {
-      const [therapistsData, patientsData, servicesData] = await Promise.all([
-        getTherapists(),
-        getPatients(),
-        getServices()
-      ])
-      setTherapists(therapistsData)
-      setPatients(patientsData)
-      setServices(servicesData)
-    } catch (error) {
-      console.error('Error loading lookup data:', error)
-    }
-  }
-
-  // Load initial data
-  useEffect(() => {
-    console.log('🔍 useEffect triggered:', { cedroUser: !!cedroUser, cedroUserData: cedroUser })
-    if (cedroUser) {
-      console.log('✅ cedroUser exists, calling loadData and loadLookupData')
-      loadData()
-      loadLookupData()
-    } else {
-      console.log('❌ cedroUser not available yet')
-    }
-  }, [cedroUser])
-
-  const handleNewAppointment = (date?: Date, time?: string) => {
+  const handleNewAppointment = useCallback((date?: Date, time?: string) => {
     setSelectedAppointment(null)
     setModalMode('create')
     setDefaultDate(date)
     setDefaultTime(time)
     setIsNewAppointmentOpen(true)
-  }
+  }, [])
 
-  const handleEditAppointment = (appointment: Appointment) => {
+  const handleEditAppointment = useCallback((appointment: Appointment) => {
     setSelectedAppointment(appointment)
     setModalMode('edit')
     setIsNewAppointmentOpen(true)
-  }
+  }, [])
 
-  const handleViewAppointment = (appointment: Appointment) => {
+  const handleViewAppointment = useCallback((appointment: Appointment) => {
     setSelectedAppointment(appointment)
     setModalMode('view')
     setIsNewAppointmentOpen(true)
-  }
+  }, [])
 
-  const handleCloseModal = () => {
+  const handleCloseModal = useCallback(() => {
     setIsNewAppointmentOpen(false)
     setSelectedAppointment(null)
     setDefaultDate(undefined)
     setDefaultTime(undefined)
-  }
+  }, [])
 
-  const handleModalSave = () => {
-    loadData() // Reload appointments after save
-  }
+  const handleModalSave = useCallback(() => {
+    // React Query will automatically refetch data
+  }, [])
 
   const navigateDate = (direction: 'prev' | 'next') => {
     switch (viewMode) {
@@ -176,9 +143,9 @@ export default function AgendaPage() {
 
   const getFilteredAppointments = () => {
     return appointments.filter(appointment => {
-      const matchesSearch = !searchTerm || 
-        appointment.patient_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        appointment.service_name?.toLowerCase().includes(searchTerm.toLowerCase())
+      const matchesSearch = !debouncedSearchTerm || 
+        appointment.patient_name?.toLowerCase().includes(debouncedSearchTerm.toLowerCase()) ||
+        appointment.service_name?.toLowerCase().includes(debouncedSearchTerm.toLowerCase())
       
       const matchesTherapist = !selectedTherapist || appointment.therapist_id === selectedTherapist
       
@@ -263,13 +230,7 @@ export default function AgendaPage() {
           <CardContent>
             <ScrollArea className="h-[600px]">
               {loading ? (
-                <div className="space-y-3">
-                  {[...Array(5)].map((_, i) => (
-                    <div key={i} className="animate-pulse">
-                      <div className="h-20 bg-gray-200 rounded-lg"></div>
-                    </div>
-                  ))}
-                </div>
+                <AppointmentListSkeleton count={5} />
               ) : dayAppointments.length === 0 ? (
                 <div className="text-center py-12">
                   <CalendarIcon className="mx-auto h-12 w-12 text-gray-400" />
@@ -282,7 +243,7 @@ export default function AgendaPage() {
                     <AppointmentCard 
                   key={appointment.id} 
                   appointment={appointment} 
-                  onUpdate={loadData}
+                  onUpdate={handleModalSave}
                   onEdit={handleEditAppointment}
                   onView={handleViewAppointment}
                 />
@@ -327,7 +288,7 @@ export default function AgendaPage() {
                         <AppointmentCard 
                           key={appointment.id} 
                           appointment={appointment} 
-                          onUpdate={loadData}
+                          onUpdate={handleModalSave}
                           onEdit={handleEditAppointment}
                           onView={handleViewAppointment}
                           compact={true}
@@ -572,24 +533,27 @@ export default function AgendaPage() {
         </div>
       </div>
 
-      <AppointmentModal
-        isOpen={isNewAppointmentOpen}
-        onClose={handleCloseModal}
-        onSave={handleModalSave}
-        appointment={selectedAppointment}
-        mode={modalMode}
-        therapists={therapists}
-        patients={patients}
-        services={services}
-        defaultDate={defaultDate}
-        defaultTime={defaultTime}
-      />
+      <Suspense fallback={<div>Carregando...</div>}>
+        <LazyAppointmentModal
+          isOpen={isNewAppointmentOpen}
+          onClose={handleCloseModal}
+          onSave={handleModalSave}
+          appointment={selectedAppointment}
+          mode={modalMode}
+          therapists={therapists}
+          patients={patients}
+          services={services}
+          defaultDate={defaultDate}
+          defaultTime={defaultTime}
+          cedroUser={cedroUser}
+        />
+      </Suspense>
     </AppShell>
   )
 }
 
 // Appointment Card Component
-function AppointmentCard({ 
+const AppointmentCard = memo(function AppointmentCard({ 
   appointment, 
   onUpdate, 
   onEdit, 
@@ -687,4 +651,4 @@ function AppointmentCard({
       </div>
     </div>
   )
-}
+})

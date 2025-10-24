@@ -82,14 +82,17 @@ export default function DisponibilidadePage() {
   const loadTherapists = useCallback(async () => {
     try {
       const therapistsData = await getTherapists()
-      setTherapists(therapistsData)
       
-      // If current user is a therapist, select them by default
+      // If current user is a therapist, only show themselves
       if (cedroUser?.role === 'therapist') {
         const currentTherapist = therapistsData.find(t => t.id === cedroUser.id)
         if (currentTherapist) {
+          setTherapists([currentTherapist])
           setSelectedTherapist(currentTherapist.id)
         }
+      } else {
+        // Admin can see all therapists
+        setTherapists(therapistsData)
       }
     } catch (error) {
       console.error('Error loading therapists:', error)
@@ -296,28 +299,30 @@ export default function DisponibilidadePage() {
           </div>
         </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <User className="h-5 w-5" />
-              Seleção de Terapeuta
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Select value={selectedTherapist} onValueChange={setSelectedTherapist}>
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Selecione um terapeuta" />
-              </SelectTrigger>
-              <SelectContent>
-                {therapists.map((therapist) => (
-                  <SelectItem key={therapist.id} value={therapist.id}>
-                    {therapist.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </CardContent>
-        </Card>
+        {cedroUser?.role === 'admin' && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <User className="h-5 w-5" />
+                Seleção de Terapeuta
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Select value={selectedTherapist} onValueChange={setSelectedTherapist}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Selecione um terapeuta" />
+                </SelectTrigger>
+                <SelectContent>
+                  {therapists.map((therapist) => (
+                    <SelectItem key={therapist.id} value={therapist.id}>
+                      {therapist.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </CardContent>
+          </Card>
+        )}
 
         {selectedTherapist && (
           <Tabs defaultValue="schedules" className="space-y-4">

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import React, { useState, useMemo, memo } from 'react'
 import { AppShell } from '@/components/layout/app-shell'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -23,31 +23,58 @@ import { toast } from 'sonner'
 import { 
   Patient, 
   PatientFilters, 
-  getPatients, 
-  getTherapistsForFilter, 
   calculateAge, 
   formatDate, 
   getStatusBadgeVariant, 
   getStatusText 
 } from '@/data/pacientes'
-import { PatientDetailDrawer } from '@/components/pacientes/patient-detail-drawer'
-import { PatientForm } from '@/components/pacientes/patient-form'
-import { PatientDeleteDialog } from '@/components/pacientes/patient-delete-dialog'
+import { Suspense } from 'react'
+import { LazyPatientForm, LazyPatientDetailDrawer, LazyPatientDeleteDialog } from '@/components/lazy'
+import { PatientListSkeleton, PatientTableSkeleton } from '@/components/skeletons/patient-skeleton'
+import { VirtualList } from '@/components/ui/virtual-list'
 import { useSupabase } from '@/providers/supabase-provider'
+import { usePatients, useTherapistsForFilter } from '@/hooks/use-patients'
+import { useDebounce } from '@/hooks/use-debounce'
+
+const limit = 10
 
 export default function PacientesPage() {
   const { cedroUser } = useSupabase()
-  const [patients, setPatients] = useState<Patient[]>([])
-  const [therapists, setTherapists] = useState<Array<{ id: string; name: string }>>([])
-  const [loading, setLoading] = useState(true)
-  const [total, setTotal] = useState(0)
-  const [totalPages, setTotalPages] = useState(0)
-  const [currentPage, setCurrentPage] = useState(1)
-  const [limit] = useState(10)
-
-  // Filters
+  
+  // Filter states
   const [filters, setFilters] = useState<PatientFilters>({})
   const [searchTerm, setSearchTerm] = useState('')
+  const [currentPage, setCurrentPage] = useState(1)
+
+  // Debounce search term to avoid excessive API calls
+  const debouncedSearchTerm = useDebounce(searchTerm, 500)
+
+  // Memoize final filters to prevent unnecessary re-renders
+  const finalFilters = useMemo(() => ({
+    ...filters,
+    search: debouncedSearchTerm || undefined
+  }), [filters, debouncedSearchTerm])
+
+  // Determine therapist ID for filtering
+  const therapistId = cedroUser?.role === 'therapist' ? cedroUser.id : undefined
+
+  // React Query hooks
+  const { 
+    data: patientsResponse, 
+    isLoading: loadingPatients, 
+    error: patientsError 
+  } = usePatients(finalFilters, { page: currentPage, limit }, therapistId)
+
+  const { 
+    data: therapists = [], 
+    isLoading: loadingTherapists 
+  } = useTherapistsForFilter()
+
+  // Extract data from response
+  const patients = patientsResponse?.data || []
+  const total = patientsResponse?.total || 0
+  const totalPages = patientsResponse?.totalPages || 0
+  const loading = loadingPatients
 
   // Modals
   const [detailDrawerOpen, setDetailDrawerOpen] = useState(false)
@@ -57,35 +84,9 @@ export default function PacientesPage() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [deletingPatient, setDeletingPatient] = useState<Patient | null>(null)
 
-  useEffect(() => {
-    loadPatients()
-    loadTherapists()
-  }, [currentPage, filters])
-
-  const loadPatients = async () => {
-    setLoading(true)
-    try {
-      // Apenas terapeutas têm filtro automático - administradores veem todos os dados
-      const therapistId = cedroUser?.role === 'therapist' ? cedroUser.id : undefined
-      const response = await getPatients(filters, { page: currentPage, limit }, therapistId)
-      setPatients(response.data)
-      setTotal(response.total)
-      setTotalPages(response.totalPages)
-    } catch (error) {
-      console.error('Error loading patients:', error)
-      toast.error('Erro ao carregar pacientes')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const loadTherapists = async () => {
-    try {
-      const therapistsData = await getTherapistsForFilter()
-      setTherapists(therapistsData)
-    } catch (error) {
-      console.error('Error loading therapists:', error)
-    }
+  // Show error toast if there's an error
+  if (patientsError) {
+    toast.error('Erro ao carregar pacientes')
   }
 
   const handleFilterChange = (key: keyof PatientFilters, value: string) => {
@@ -97,10 +98,8 @@ export default function PacientesPage() {
   }
 
   const handleSearch = () => {
-    setFilters(prev => ({
-      ...prev,
-      search: searchTerm || undefined
-    }))
+    // Search is now handled automatically by debounced search term
+    // Reset to first page when searching
     setCurrentPage(1)
   }
 
@@ -119,17 +118,94 @@ export default function PacientesPage() {
     setDeleteDialogOpen(true)
   }
 
+  // Component for rendering patient row - optimized for virtual list
+  const PatientRow = memo(({ patient }: { patient: Patient }) => (
+    <TableRow key={patient.id}>
+      <TableCell>
+        <div className="flex items-center space-x-3">
+          <Avatar className="h-8 w-8">
+            <AvatarFallback>
+              {getInitials(patient.full_name)}
+            </AvatarFallback>
+          </Avatar>
+          <div>
+            <div className="font-medium">{patient.full_name}</div>
+            <div className="text-sm text-muted-foreground">{patient.gender || 'Não informado'}</div>
+          </div>
+        </div>
+      </TableCell>
+      <TableCell>
+        <div className="space-y-1">
+          <div className="flex items-center text-sm">
+            <Mail className="mr-1 h-3 w-3" />
+            {patient.email}
+          </div>
+          {patient.phone && (
+            <div className="flex items-center text-sm">
+              <Phone className="mr-1 h-3 w-3" />
+              {patient.phone}
+            </div>
+          )}
+        </div>
+      </TableCell>
+      <TableCell>
+        {calculateAge(patient.birth_date) || '-'} {calculateAge(patient.birth_date) ? 'anos' : ''}
+      </TableCell>
+      <TableCell>
+        <Badge variant={patient.is_on_hold ? 'secondary' : 'default'}>
+          {patient.is_on_hold ? 'Em pausa' : 'Ativo'}
+        </Badge>
+      </TableCell>
+      <TableCell>{patient.current_therapist_name || 'Não atribuído'}</TableCell>
+      <TableCell>{formatDate(patient.last_appointment || null)}</TableCell>
+      <TableCell>{patient.total_appointments || 0}</TableCell>
+      <TableCell className="text-right">
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" className="h-8 w-8 p-0">
+              <span className="sr-only">Abrir menu</span>
+              <MoreHorizontal className="h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuLabel>Ações</DropdownMenuLabel>
+            <DropdownMenuItem onClick={() => handleViewPatient(patient.id)}>
+              <Eye className="mr-2 h-4 w-4" />
+              Ver detalhes
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => handleEditPatient(patient.id)}>
+              <Edit className="mr-2 h-4 w-4" />
+              Editar
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem 
+              className="text-destructive"
+              onClick={() => handleDeletePatient(patient)}
+            >
+              <Trash2 className="mr-2 h-4 w-4" />
+              Excluir
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </TableCell>
+     </TableRow>
+   ))
+
   const handleNewPatient = () => {
     setEditingPatientId(null)
     setFormOpen(true)
   }
 
   const handlePatientSaved = () => {
-    loadPatients()
+    // React Query will automatically refetch data via mutations
+    setFormOpen(false)
+    setEditingPatientId(null)
   }
 
   const handlePatientDeleted = () => {
-    loadPatients()
+    // React Query will automatically refetch data via mutations
+    setDeleteDialogOpen(false)
+    setDeletingPatient(null)
   }
 
   const handlePageChange = (page: number) => {
@@ -146,7 +222,7 @@ export default function PacientesPage() {
   }
 
   // Calculate stats
-  const activePatients = patients.filter(p => p.status === 'active').length
+  const activePatients = patients.filter(p => !p.is_on_hold).length
   const totalAppointments = patients.reduce((sum, p) => sum + (p.total_appointments || 0), 0)
 
   return (
@@ -347,77 +423,22 @@ export default function PacientesPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {patients.map((patient) => (
-                      <TableRow key={patient.id}>
-                        <TableCell>
-                          <div className="flex items-center space-x-3">
-                            <Avatar className="h-8 w-8">
-                              <AvatarFallback>
-                                {getInitials(patient.full_name)}
-                              </AvatarFallback>
-                            </Avatar>
-                            <div>
-                              <div className="font-medium">{patient.full_name}</div>
-                              <div className="text-sm text-muted-foreground">{patient.gender || 'Não informado'}</div>
-                            </div>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <div className="space-y-1">
-                            <div className="flex items-center text-sm">
-                              <Mail className="mr-1 h-3 w-3" />
-                              {patient.email}
-                            </div>
-                            {patient.phone && (
-                              <div className="flex items-center text-sm">
-                                <Phone className="mr-1 h-3 w-3" />
-                                {patient.phone}
-                              </div>
-                            )}
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          {calculateAge(patient.birth_date) || '-'} {calculateAge(patient.birth_date) ? 'anos' : ''}
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant={getStatusBadgeVariant(patient.status)}>
-                            {getStatusText(patient.status)}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>{patient.current_therapist_name || 'Não atribuído'}</TableCell>
-                        <TableCell>{formatDate(patient.last_appointment || null)}</TableCell>
-                        <TableCell>{patient.total_appointments || 0}</TableCell>
-                        <TableCell className="text-right">
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" className="h-8 w-8 p-0">
-                                <span className="sr-only">Abrir menu</span>
-                                <MoreHorizontal className="h-4 w-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuLabel>Ações</DropdownMenuLabel>
-                              <DropdownMenuItem onClick={() => handleViewPatient(patient.id)}>
-                                <Eye className="mr-2 h-4 w-4" />
-                                Ver detalhes
-                              </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => handleEditPatient(patient.id)}>
-                                <Edit className="mr-2 h-4 w-4" />
-                                Editar
-                              </DropdownMenuItem>
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem 
-                                className="text-destructive"
-                                onClick={() => handleDeletePatient(patient)}
-                              >
-                                <Trash2 className="mr-2 h-4 w-4" />
-                                Excluir
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </TableCell>
-                      </TableRow>
-                    ))}
+                    {loading ? (
+                      <PatientTableSkeleton count={5} />
+                    ) : patients.length > 50 ? (
+                      // Use virtual list for large datasets
+                      <VirtualList
+                        items={patients}
+                        itemHeight={72}
+                        height={400}
+                        renderItem={(patient) => <PatientRow patient={patient} />}
+                      />
+                    ) : (
+                      // Regular rendering for smaller datasets
+                      patients.map((patient) => (
+                        <PatientRow key={patient.id} patient={patient} />
+                      ))
+                    )}
                   </TableBody>
                 </Table>
                 
@@ -461,34 +482,41 @@ export default function PacientesPage() {
       </div>
 
       {/* Patient Detail Drawer */}
-      <PatientDetailDrawer
-        patientId={selectedPatientId}
-        open={detailDrawerOpen}
-        onOpenChange={setDetailDrawerOpen}
-        onEdit={handleEditPatient}
-        onDelete={(patientId: string) => {
-          const patient = patients.find(p => p.id === patientId)
-          if (patient) {
-            handleDeletePatient(patient)
-          }
-        }}
-      />
+      <Suspense fallback={<div>Carregando...</div>}>
+        <LazyPatientDetailDrawer
+          patientId={selectedPatientId}
+          open={detailDrawerOpen}
+          onOpenChange={setDetailDrawerOpen}
+          onEdit={handleEditPatient}
+          onDelete={(patientId: string) => {
+            const patient = patients.find(p => p.id === patientId)
+            if (patient) {
+              handleDeletePatient(patient)
+            }
+          }}
+        />
+      </Suspense>
 
       {/* Patient Form Dialog */}
-      <PatientForm
-        patientId={editingPatientId}
-        open={formOpen}
-        onOpenChange={setFormOpen}
-        onSuccess={handlePatientSaved}
-      />
+      <Suspense fallback={<div>Carregando...</div>}>
+        <LazyPatientForm
+          patientId={editingPatientId}
+          open={formOpen}
+          onOpenChange={setFormOpen}
+          onSuccess={handlePatientSaved}
+          cedroUser={cedroUser}
+        />
+      </Suspense>
 
       {/* Patient Delete Dialog */}
-      <PatientDeleteDialog
-        patient={deletingPatient}
-        open={deleteDialogOpen}
-        onOpenChange={setDeleteDialogOpen}
-        onSuccess={handlePatientDeleted}
-      />
+      <Suspense fallback={<div>Carregando...</div>}>
+        <LazyPatientDeleteDialog
+          patient={deletingPatient}
+          open={deleteDialogOpen}
+          onOpenChange={setDeleteDialogOpen}
+          onSuccess={handlePatientDeleted}
+        />
+      </Suspense>
     </AppShell>
   )
 }

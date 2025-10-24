@@ -148,8 +148,8 @@ export function PatientDetailDrawer({
                   {patient.email}
                 </SheetDescription>
                 <div className="mt-2">
-                  <Badge variant={getStatusBadgeVariant(patient.status)}>
-                    {getStatusText(patient.status)}
+                  <Badge variant={patient.is_on_hold ? 'secondary' : 'default'}>
+                    {patient.is_on_hold ? 'Em pausa' : 'Ativo'}
                   </Badge>
                 </div>
               </div>
@@ -229,15 +229,6 @@ export function PatientDetailDrawer({
                     </div>
                   </div>
                 </div>
-                {patient.emergency_contact && (
-                  <div className="flex items-center space-x-2">
-                    <AlertCircle className="h-4 w-4 text-muted-foreground" />
-                    <div>
-                      <p className="text-sm font-medium">Contato de Emergência</p>
-                      <p className="text-sm text-muted-foreground">{patient.emergency_contact}</p>
-                    </div>
-                  </div>
-                )}
               </CardContent>
             </Card>
 
@@ -425,12 +416,12 @@ export function PatientDetailDrawer({
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                {patient.medical_history ? (
+                {patient.notes ? (
                   <div className="p-4 bg-muted rounded-lg">
-                    <p className="text-sm">{patient.medical_history}</p>
+                    <p className="text-sm">{patient.notes}</p>
                   </div>
                 ) : (
-                  <p className="text-muted-foreground">Nenhum histórico médico registrado</p>
+                  <p className="text-muted-foreground">Nenhuma observação registrada</p>
                 )}
               </CardContent>
             </Card>

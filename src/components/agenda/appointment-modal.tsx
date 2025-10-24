@@ -35,6 +35,7 @@ type AppointmentModalProps = {
   services: Array<{ id: string; name: string; duration_minutes: number }>
   defaultDate?: Date
   defaultTime?: string
+  cedroUser?: { id: string; role: string; name: string } | null
 }
 
 const statusOptions = [
@@ -54,7 +55,8 @@ export function AppointmentModal({
   patients,
   services,
   defaultDate,
-  defaultTime
+  defaultTime,
+  cedroUser
 }: AppointmentModalProps) {
   const { toast } = useToast()
   const [loading, setLoading] = useState(false)
@@ -81,8 +83,15 @@ export function AppointmentModal({
   }, [patients])
 
   useEffect(() => {
-    setFilteredTherapists(therapists)
-  }, [therapists])
+    // If user is a therapist, only show themselves
+    if (cedroUser?.role === 'therapist') {
+      const currentTherapist = therapists.find(t => t.id === cedroUser.id)
+      setFilteredTherapists(currentTherapist ? [currentTherapist] : [])
+    } else {
+      // Admin can see all therapists
+      setFilteredTherapists(therapists)
+    }
+  }, [therapists, cedroUser])
 
   useEffect(() => {
     if (appointment && (isEditing || mode === 'view')) {
@@ -103,7 +112,7 @@ export function AppointmentModal({
     } else if (isCreating) {
       setFormData({
         patient_id: '',
-        therapist_id: '',
+        therapist_id: cedroUser?.role === 'therapist' ? cedroUser.id : '',
         service_id: '',
         status: 'scheduled',
         date: defaultDate || new Date(),
@@ -112,7 +121,7 @@ export function AppointmentModal({
         notes: ''
       })
     }
-  }, [appointment, mode, defaultDate, defaultTime, isEditing, isCreating])
+  }, [appointment, mode, defaultDate, defaultTime, isEditing, isCreating, cedroUser])
 
   // Filter patients based on selected therapist
   useEffect(() => {

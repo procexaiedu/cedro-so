@@ -143,15 +143,20 @@ export type PatientStatus = 'active' | 'inactive' | 'suspended'
 
 export type Patient = {
   id: string
-  user_id: string
   full_name: string
-  email: string
+  email: string | null
   phone: string | null
   birth_date: string | null
   gender: string | null
-  emergency_contact: string | null
-  medical_history: string | null
-  status: PatientStatus
+  cpf: string | null
+  is_christian: boolean | null
+  origin: string | null
+  marital_status: string | null
+  occupation: string | null
+  notes: string | null
+  address_json: any
+  tags_text: string[]
+  is_on_hold: boolean
   created_at: string
   updated_at: string
   // Joined data
@@ -220,13 +225,19 @@ export type PatientListResponse = {
 
 export type CreatePatientData = {
   full_name: string
-  email: string
+  email?: string
   phone?: string
   birth_date?: string
   gender?: string
-  emergency_contact?: string
-  medical_history?: string
-  status?: PatientStatus
+  cpf?: string
+  is_christian?: boolean
+  origin?: string
+  marital_status?: string
+  occupation?: string
+  notes?: string
+  address_json?: any
+  tags_text?: string[]
+  is_on_hold?: boolean
 }
 
 export type UpdatePatientData = Partial<CreatePatientData>
@@ -240,29 +251,15 @@ export async function getPatients(
   therapistId?: string
 ): Promise<PatientListResponse> {
   try {
+    // Use the optimized view for better performance
     let query = supabase
       .schema('cedro')
-      .from('patients')
+      .from('vw_patient_overview')
       .select('*', { count: 'exact' })
 
     // If therapistId is provided, filter by linked patients only
     if (therapistId) {
-      // First get the patient IDs for this therapist
-      const { data: linkedPatients } = await supabase
-        .schema('cedro')
-        .from('patient_therapist_links')
-        .select('patient_id')
-        .eq('therapist_id', therapistId)
-        .eq('status', 'active')
-      
-      const patientIds = linkedPatients?.map(link => link.patient_id) || []
-      
-      if (patientIds.length > 0) {
-        query = query.in('id', patientIds)
-      } else {
-        // If no linked patients, return empty result
-        query = query.eq('id', 'no-patients-found')
-      }
+      query = query.eq('current_therapist_id', therapistId)
     }
 
     // Apply filters
@@ -287,22 +284,27 @@ export async function getPatients(
 
     const patients: Patient[] = (data || []).map((row: any) => ({
       id: row.id,
-      user_id: row.id, // Using patient id as user_id
       full_name: row.full_name,
-      email: row.email || '',
+      email: row.email,
       phone: row.phone,
       birth_date: row.birth_date,
       gender: row.gender,
-      emergency_contact: null, // Not in patients table
-      medical_history: row.notes, // Using notes as medical history
-      status: row.is_on_hold ? 'suspended' : 'active' as PatientStatus,
+      cpf: row.cpf,
+      is_christian: row.is_christian,
+      origin: row.origin,
+      marital_status: row.marital_status,
+      occupation: row.occupation,
+      notes: row.notes,
+      address_json: row.address_json || {},
+      tags_text: row.tags_text || [],
+      is_on_hold: row.is_on_hold || false,
       created_at: row.created_at,
       updated_at: row.updated_at,
-      current_therapist_id: null, // Will be loaded separately if needed
-      current_therapist_name: null, // Will be loaded separately if needed
-      total_appointments: 0, // Will be calculated separately if needed
-      last_appointment: null,
-      next_appointment: null
+      current_therapist_id: row.current_therapist_id,
+      current_therapist_name: row.current_therapist_name,
+      total_appointments: row.total_appointments || 0,
+      last_appointment: row.last_appointment,
+      next_appointment: row.next_appointment
     }))
 
     return {
@@ -321,6 +323,36 @@ export async function getPatients(
       limit: pagination.limit,
       totalPages: 0
     }
+  }
+}
+
+/**
+ * Create patient-therapist link
+ */
+export async function createPatientTherapistLink(
+  patientId: string, 
+  therapistId: string
+): Promise<boolean> {
+  try {
+    const { error } = await supabase
+      .schema('cedro')
+      .from('patient_therapist_links')
+      .insert({
+        patient_id: patientId,
+        therapist_id: therapistId,
+        status: 'active',
+        started_at: new Date().toISOString()
+      })
+
+    if (error) {
+      console.error('Error creating patient-therapist link:', error)
+      return false
+    }
+
+    return true
+  } catch (error) {
+    console.error('Error in createPatientTherapistLink:', error)
+    return false
   }
 }
 
@@ -345,15 +377,20 @@ export async function getPatientById(id: string): Promise<Patient | null> {
 
     return {
       id: data.id,
-      user_id: data.user_id || '',
       full_name: data.full_name,
       email: data.email,
       phone: data.phone,
       birth_date: data.birth_date,
       gender: data.gender,
-      emergency_contact: data.emergency_contact,
-      medical_history: data.medical_history,
-      status: 'active' as PatientStatus,
+      cpf: data.cpf,
+      is_christian: data.is_christian,
+      origin: data.origin,
+      marital_status: data.marital_status,
+      occupation: data.occupation,
+      notes: data.notes,
+      address_json: data.address_json || {},
+      tags_text: data.tags_text || [],
+      is_on_hold: data.is_on_hold || false,
       created_at: data.created_at,
       updated_at: data.updated_at
     }
@@ -453,34 +490,25 @@ export async function getPatientOverview(id: string): Promise<PatientOverview | 
  */
 export async function createPatient(data: CreatePatientData): Promise<Patient | null> {
   try {
-    // First create user
-    const { data: userData, error: userError } = await supabase
-      .schema('cedro')
-      .from('users')
-      .insert({
-        full_name: data.full_name,
-        email: data.email,
-        phone: data.phone,
-        role: 'patient'
-      })
-      .select()
-      .single()
-
-    if (userError) {
-      console.error('Error creating user:', userError)
-      throw userError
-    }
-
-    // Then create patient
+    // Create patient directly (no user table needed based on current schema)
     const { data: patientData, error: patientError } = await supabase
       .schema('cedro')
       .from('patients')
       .insert({
-        user_id: userData.id,
+        full_name: data.full_name,
+        email: data.email,
+        phone: data.phone,
         birth_date: data.birth_date,
         gender: data.gender,
-        emergency_contact: data.emergency_contact,
-        medical_history: data.medical_history
+        cpf: data.cpf,
+        is_christian: data.is_christian,
+        origin: data.origin,
+        marital_status: data.marital_status,
+        occupation: data.occupation,
+        notes: data.notes,
+        address_json: data.address_json || {},
+        tags_text: data.tags_text || [],
+        is_on_hold: data.is_on_hold || false
       })
       .select()
       .single()
@@ -492,15 +520,20 @@ export async function createPatient(data: CreatePatientData): Promise<Patient | 
 
     return {
       id: patientData.id,
-      user_id: patientData.user_id,
-      full_name: data.full_name,
-      email: data.email,
-      phone: data.phone || null,
-      birth_date: data.birth_date || null,
-      gender: data.gender || null,
-      emergency_contact: data.emergency_contact || null,
-      medical_history: data.medical_history || null,
-      status: data.status || 'active',
+      full_name: patientData.full_name,
+      email: patientData.email,
+      phone: patientData.phone,
+      birth_date: patientData.birth_date,
+      gender: patientData.gender,
+      cpf: patientData.cpf,
+      is_christian: patientData.is_christian,
+      origin: patientData.origin,
+      marital_status: patientData.marital_status,
+      occupation: patientData.occupation,
+      notes: patientData.notes,
+      address_json: patientData.address_json,
+      tags_text: patientData.tags_text,
+      is_on_hold: patientData.is_on_hold,
       created_at: patientData.created_at,
       updated_at: patientData.updated_at
     }
@@ -518,33 +551,25 @@ export async function updatePatient(id: string, data: UpdatePatientData): Promis
     const patient = await getPatientById(id)
     if (!patient) return null
 
-    // Update user data
-    if (data.full_name || data.email || data.phone) {
-      const { error: userError } = await supabase
-        .schema('cedro')
-        .from('users')
-        .update({
-          ...(data.full_name && { full_name: data.full_name }),
-          ...(data.email && { email: data.email }),
-          ...(data.phone !== undefined && { phone: data.phone })
-        })
-        .eq('id', patient.user_id)
-
-      if (userError) {
-        console.error('Error updating user:', userError)
-        throw userError
-      }
-    }
-
     // Update patient data
     const { data: patientData, error: patientError } = await supabase
       .schema('cedro')
       .from('patients')
       .update({
+        ...(data.full_name && { full_name: data.full_name }),
+        ...(data.email !== undefined && { email: data.email }),
+        ...(data.phone !== undefined && { phone: data.phone }),
         ...(data.birth_date !== undefined && { birth_date: data.birth_date }),
         ...(data.gender !== undefined && { gender: data.gender }),
-        ...(data.emergency_contact !== undefined && { emergency_contact: data.emergency_contact }),
-        ...(data.medical_history !== undefined && { medical_history: data.medical_history }),
+        ...(data.cpf !== undefined && { cpf: data.cpf }),
+        ...(data.is_christian !== undefined && { is_christian: data.is_christian }),
+        ...(data.origin !== undefined && { origin: data.origin }),
+        ...(data.marital_status !== undefined && { marital_status: data.marital_status }),
+        ...(data.occupation !== undefined && { occupation: data.occupation }),
+        ...(data.notes !== undefined && { notes: data.notes }),
+        ...(data.address_json !== undefined && { address_json: data.address_json }),
+        ...(data.tags_text !== undefined && { tags_text: data.tags_text }),
+        ...(data.is_on_hold !== undefined && { is_on_hold: data.is_on_hold }),
         updated_at: new Date().toISOString()
       })
       .eq('id', id)
@@ -581,18 +606,6 @@ export async function deletePatient(id: string): Promise<boolean> {
     if (patientError) {
       console.error('Error deleting patient:', patientError)
       throw patientError
-    }
-
-    // Delete user record
-    const { error: userError } = await supabase
-      .schema('cedro')
-      .from('users')
-      .delete()
-      .eq('id', patient.user_id)
-
-    if (userError) {
-      console.error('Error deleting user:', userError)
-      throw userError
     }
 
     return true

@@ -757,8 +757,8 @@ export function NewRecordModal({
                       }
                     </span>
                   </div>
-                  <Badge variant={selectedPatient.status === 'active' ? 'default' : 'secondary'}>
-                    {selectedPatient.status === 'active' ? 'Ativo' : 'Inativo'}
+                  <Badge variant={selectedPatient.is_on_hold ? 'secondary' : 'default'}>
+                    {selectedPatient.is_on_hold ? 'Em pausa' : 'Ativo'}
                   </Badge>
                 </div>
               </CardContent>

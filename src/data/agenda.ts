@@ -53,18 +53,11 @@ export async function getAppointments(
   therapistId?: string
 ): Promise<Appointment[]> {
   try {
+    // Use the optimized view for better performance
     let query = supabase
       .schema('cedro')
-      .from('appointments')
-      .select(`
-        *,
-        patients!inner(
-          full_name,
-          email
-        ),
-        therapists:users!therapist_id(name),
-        services(name)
-      `)
+      .from('appointments_with_details')
+      .select('*')
       .gte('start_at', startDate.toISOString())
       .lte('start_at', endDate.toISOString())
       .order('start_at', { ascending: true })
@@ -80,13 +73,7 @@ export async function getAppointments(
       return []
     }
 
-    return (data || []).map((appointment: any) => ({
-      ...appointment,
-      patient_name: appointment.patients?.full_name,
-      patient_email: appointment.patients?.email,
-      therapist_name: appointment.therapists?.name,
-      service_name: appointment.services?.name,
-    }))
+    return data || []
   } catch (error) {
     console.error('Error in getAppointments:', error)
     return []

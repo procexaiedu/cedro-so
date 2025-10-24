@@ -24,6 +24,7 @@ import {
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
+import { Switch } from '@/components/ui/switch'
 import {
   Select,
   SelectContent,
@@ -33,16 +34,22 @@ import {
 } from '@/components/ui/select'
 import { toast } from 'sonner'
 import { Loader2 } from 'lucide-react'
-import { Patient, CreatePatientData, UpdatePatientData, createPatient, updatePatient, getPatientById } from '@/data/pacientes'
+import { Patient, CreatePatientData, UpdatePatientData, getPatientById, createPatientTherapistLink } from '@/data/pacientes'
+import { useCreatePatient, useUpdatePatient } from '@/hooks/use-patients'
+import { CedroUser } from '@/lib/auth'
 
 const patientFormSchema = z.object({
   full_name: z.string().min(2, 'Nome deve ter pelo menos 2 caracteres'),
-  email: z.string().email('Email inválido'),
-  phone: z.string().optional(),
+  email: z.string().email('Email inválido').optional().or(z.literal('')),
+  phone: z.string().min(1).optional().or(z.literal('')),
   birth_date: z.string().optional(),
   gender: z.string().optional(),
-  emergency_contact: z.string().optional(),
-  medical_history: z.string().optional(),
+  cpf: z.string().optional(),
+  is_christian: z.boolean().optional(),
+  origin: z.string().optional(),
+  marital_status: z.string().optional(),
+  occupation: z.string().optional(),
+  notes: z.string().optional(),
 })
 
 type PatientFormData = z.infer<typeof patientFormSchema>
@@ -52,12 +59,16 @@ interface PatientFormProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   onSuccess?: (patient: Patient) => void
+  cedroUser?: CedroUser | null
 }
 
-export function PatientForm({ patientId, open, onOpenChange, onSuccess }: PatientFormProps) {
-  const [loading, setLoading] = useState(false)
+export function PatientForm({ patientId, open, onOpenChange, onSuccess, cedroUser }: PatientFormProps) {
   const [loadingPatient, setLoadingPatient] = useState(false)
   const isEditing = !!patientId
+
+  // React Query mutations
+  const createPatientMutation = useCreatePatient()
+  const updatePatientMutation = useUpdatePatient()
 
   const form = useForm<PatientFormData>({
     resolver: zodResolver(patientFormSchema),
@@ -67,10 +78,16 @@ export function PatientForm({ patientId, open, onOpenChange, onSuccess }: Patien
       phone: '',
       birth_date: '',
       gender: '',
-      emergency_contact: '',
-      medical_history: '',
+      cpf: '',
+      is_christian: false,
+      origin: '',
+      marital_status: '',
+      occupation: '',
+      notes: '',
     },
   })
+
+  const loading = createPatientMutation.isPending || updatePatientMutation.isPending
 
   useEffect(() => {
     if (isEditing && patientId && open) {
@@ -82,8 +99,12 @@ export function PatientForm({ patientId, open, onOpenChange, onSuccess }: Patien
         phone: '',
         birth_date: '',
         gender: '',
-        emergency_contact: '',
-        medical_history: '',
+        cpf: '',
+        is_christian: false,
+        origin: '',
+        marital_status: '',
+        occupation: '',
+        notes: '',
       })
     }
   }, [patientId, open, isEditing])
@@ -97,12 +118,16 @@ export function PatientForm({ patientId, open, onOpenChange, onSuccess }: Patien
       if (patient) {
         form.reset({
           full_name: patient.full_name,
-          email: patient.email,
+          email: patient.email || '',
           phone: patient.phone || '',
           birth_date: patient.birth_date || '',
           gender: patient.gender || '',
-          emergency_contact: patient.emergency_contact || '',
-          medical_history: patient.medical_history || '',
+          cpf: patient.cpf || '',
+          is_christian: patient.is_christian || false,
+          origin: patient.origin || '',
+          marital_status: patient.marital_status || '',
+          occupation: patient.occupation || '',
+          notes: patient.notes || '',
         })
       }
     } catch (error) {
@@ -114,59 +139,60 @@ export function PatientForm({ patientId, open, onOpenChange, onSuccess }: Patien
   }
 
   const onSubmit = async (data: PatientFormData) => {
-    setLoading(true)
     try {
-      let result: Patient | null = null
-
       if (isEditing && patientId) {
         const updateData: UpdatePatientData = {
           full_name: data.full_name,
-          email: data.email,
-          phone: data.phone || undefined,
+          email: data.email && data.email.trim() !== '' ? data.email : undefined,
+          phone: data.phone && data.phone.trim() !== '' ? data.phone : undefined,
           birth_date: data.birth_date || undefined,
           gender: data.gender || undefined,
-          emergency_contact: data.emergency_contact || undefined,
-          medical_history: data.medical_history || undefined,
+          cpf: data.cpf || undefined,
+          is_christian: data.is_christian,
+          origin: data.origin || undefined,
+          marital_status: data.marital_status || undefined,
+          occupation: data.occupation || undefined,
+          notes: data.notes || undefined,
         }
-        result = await updatePatient(patientId, updateData)
+        
+        const result = await updatePatientMutation.mutateAsync({ id: patientId, data: updateData })
+        if (result) {
+          onSuccess?.(result)
+          onOpenChange(false)
+        }
       } else {
         const createData: CreatePatientData = {
           full_name: data.full_name,
-          email: data.email,
-          phone: data.phone || undefined,
+          email: data.email && data.email.trim() !== '' ? data.email : undefined,
+          phone: data.phone && data.phone.trim() !== '' ? data.phone : undefined,
           birth_date: data.birth_date || undefined,
           gender: data.gender || undefined,
-          emergency_contact: data.emergency_contact || undefined,
-          medical_history: data.medical_history || undefined,
-          status: 'active',
+          cpf: data.cpf || undefined,
+          is_christian: data.is_christian,
+          origin: data.origin || undefined,
+          marital_status: data.marital_status || undefined,
+          occupation: data.occupation || undefined,
+          notes: data.notes || undefined,
         }
-        result = await createPatient(createData)
-      }
-
-      if (result) {
-        toast.success(
-          isEditing 
-            ? 'Paciente atualizado com sucesso!' 
-            : 'Paciente criado com sucesso!'
-        )
-        onSuccess?.(result)
-        onOpenChange(false)
-      } else {
-        toast.error(
-          isEditing 
-            ? 'Erro ao atualizar paciente' 
-            : 'Erro ao criar paciente'
-        )
+        
+        const result = await createPatientMutation.mutateAsync(createData)
+        
+        // If a therapist created the patient, create the link automatically
+        if (result && cedroUser?.role === 'therapist') {
+          const linkCreated = await createPatientTherapistLink(result.id, cedroUser.id)
+          if (!linkCreated) {
+            console.warn('Patient created but failed to create therapist link')
+          }
+        }
+        
+        if (result) {
+          onSuccess?.(result)
+          onOpenChange(false)
+        }
       }
     } catch (error) {
+      // Error handling is done by the mutations
       console.error('Error saving patient:', error)
-      toast.error(
-        isEditing 
-          ? 'Erro ao atualizar paciente' 
-          : 'Erro ao criar paciente'
-      )
-    } finally {
-      setLoading(false)
     }
   }
 
@@ -293,19 +319,16 @@ export function PatientForm({ patientId, open, onOpenChange, onSuccess }: Patien
 
                 <FormField
                   control={form.control}
-                  name="emergency_contact"
+                  name="cpf"
                   render={({ field }) => (
-                    <FormItem className="md:col-span-2">
-                      <FormLabel>Contato de Emergência</FormLabel>
+                    <FormItem>
+                      <FormLabel>CPF</FormLabel>
                       <FormControl>
                         <Input 
-                          placeholder="Nome e telefone do contato de emergência" 
+                          placeholder="000.000.000-00" 
                           {...field} 
                         />
                       </FormControl>
-                      <FormDescription>
-                        Ex: Maria Silva - (11) 98765-4321
-                      </FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -313,19 +336,101 @@ export function PatientForm({ patientId, open, onOpenChange, onSuccess }: Patien
 
                 <FormField
                   control={form.control}
-                  name="medical_history"
+                  name="is_christian"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                      <div className="space-y-0.5">
+                        <FormLabel className="text-base">
+                          É cristão?
+                        </FormLabel>
+                        <FormDescription>
+                          Informação sobre religião do paciente
+                        </FormDescription>
+                      </div>
+                      <FormControl>
+                        <Switch
+                          checked={field.value}
+                          onCheckedChange={field.onChange}
+                        />
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="origin"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Origem</FormLabel>
+                      <FormControl>
+                        <Input 
+                          placeholder="Como chegou até nós?" 
+                          {...field} 
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="marital_status"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Estado Civil</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Selecione o estado civil" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="solteiro">Solteiro(a)</SelectItem>
+                          <SelectItem value="casado">Casado(a)</SelectItem>
+                          <SelectItem value="divorciado">Divorciado(a)</SelectItem>
+                          <SelectItem value="viuvo">Viúvo(a)</SelectItem>
+                          <SelectItem value="uniao-estavel">União Estável</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="occupation"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Profissão</FormLabel>
+                      <FormControl>
+                        <Input 
+                          placeholder="Qual a profissão do paciente?" 
+                          {...field} 
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="notes"
                   render={({ field }) => (
                     <FormItem className="md:col-span-2">
-                      <FormLabel>Histórico Médico</FormLabel>
+                      <FormLabel>Observações</FormLabel>
                       <FormControl>
                         <Textarea 
-                          placeholder="Descreva o histórico médico relevante do paciente..."
+                          placeholder="Observações gerais sobre o paciente..."
                           className="min-h-[100px]"
                           {...field} 
                         />
                       </FormControl>
                       <FormDescription>
-                        Inclua informações sobre condições médicas, medicamentos, alergias, etc.
+                        Inclua informações relevantes sobre o paciente
                       </FormDescription>
                       <FormMessage />
                     </FormItem>
