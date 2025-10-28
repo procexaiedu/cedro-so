@@ -29,7 +29,8 @@ export function SupabaseProvider({ children }: { children: React.ReactNode }) {
   const { handleAuthError } = useAuthInterceptor()
   
   // Ativar atualizações em tempo real para appointments
-  useRealtimeAppointments()
+  // TEMPORARIAMENTE DESABILITADO PARA TESTE - pode estar causando infinite loading
+  // useRealtimeAppointments()
 
   // Function to handle JWT expiration
   const handleJWTExpired = async () => {

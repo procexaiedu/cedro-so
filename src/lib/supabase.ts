@@ -16,11 +16,12 @@ export const supabase = createSupabaseClient(supabaseUrl, supabaseAnonKey, {
   db: {
     schema: 'cedro',
   },
-  realtime: {
-    params: {
-      eventsPerSecond: 10,
-    },
-  },
+  // TEMPORARIAMENTE DESABILITADO - pode estar causando infinite loading
+  // realtime: {
+  //   params: {
+  //     eventsPerSecond: 10,
+  //   },
+  // },
 })
 
 // Export a function to create new client instances
@@ -38,11 +39,12 @@ export function createClient() {
     db: {
       schema: 'cedro',
     },
-    realtime: {
-      params: {
-        eventsPerSecond: 10,
-      },
-    },
+    // TEMPORARIAMENTE DESABILITADO - pode estar causando infinite loading
+    // realtime: {
+    //   params: {
+    //     eventsPerSecond: 10,
+    //   },
+    // },
   })
 }
 
