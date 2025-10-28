@@ -115,7 +115,7 @@ export function SupabaseProvider({ children }: { children: React.ReactNode }) {
         console.error('❌ Error in getInitialSession:', error)
         
         // Emergency fallback - if Supabase is completely unresponsive
-        if (error.message?.includes('timeout')) {
+        if (error instanceof Error && error.message?.includes('timeout')) {
           console.log('⚠️ Supabase timeout detected - using emergency fallback')
           
           // Try to redirect to login as fallback
