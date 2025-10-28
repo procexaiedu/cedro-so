@@ -25,6 +25,15 @@ export function SupabaseProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true)
   const router = useRouter()
 
+  // Debug logging
+  console.log('🔍 SupabaseProvider render:', { 
+    user: user?.id, 
+    session: !!session, 
+    cedroUser: cedroUser?.id, 
+    loading,
+    timestamp: new Date().toISOString()
+  })
+
   // Ativar interceptador de autenticação
   const { handleAuthError } = useAuthInterceptor()
   
@@ -47,13 +56,19 @@ export function SupabaseProvider({ children }: { children: React.ReactNode }) {
 
     // Get initial session
     const getInitialSession = async () => {
+      console.log('🚀 Starting getInitialSession...')
       try {
+        console.log('📡 Calling supabase.auth.getSession()...')
         const { data: { session }, error } = await supabase.auth.getSession()
+        console.log('📡 getSession result:', { session: !!session, error: !!error })
         
-        if (!isMounted) return
+        if (!isMounted) {
+          console.log('⚠️ Component unmounted, returning early')
+          return
+        }
         
         if (error) {
-          console.error('Error getting session:', error)
+          console.error('❌ Error getting session:', error)
           setSession(null)
           setUser(null)
           setCedroUser(null)
@@ -61,26 +76,31 @@ export function SupabaseProvider({ children }: { children: React.ReactNode }) {
           return
         }
 
+        console.log('✅ Setting session and user state...')
         setSession(session)
         setUser(session?.user ?? null)
         
         if (session?.user) {
+          console.log('👤 User found, mapping to CedroUser...')
           try {
             const mappedUser = await mapAuthUserToCedroUser(session.user)
+            console.log('✅ User mapped successfully:', mappedUser?.id)
             if (isMounted) {
               setCedroUser(mappedUser)
             }
           } catch (error) {
-            console.error('Error mapping user:', error)
+            console.error('❌ Error mapping user:', error)
             if (isMounted) {
               setCedroUser(null)
             }
           }
         } else {
+          console.log('👤 No user in session')
           setCedroUser(null)
         }
         
         if (isMounted) {
+          console.log('🏁 Setting loading to false')
           setLoading(false)
         }
       } catch (error) {

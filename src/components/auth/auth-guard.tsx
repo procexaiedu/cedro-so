@@ -13,13 +13,23 @@ export function AuthGuard({ children }: AuthGuardProps) {
   const { user, loading } = useSupabase()
   const router = useRouter()
 
+  // Debug logging
+  console.log('🛡️ AuthGuard render:', { 
+    user: user?.id, 
+    loading, 
+    timestamp: new Date().toISOString() 
+  })
+
   useEffect(() => {
+    console.log('🛡️ AuthGuard useEffect:', { user: user?.id, loading })
     if (!loading && !user) {
+      console.log('🔄 Redirecting to login...')
       router.push('/login')
     }
   }, [user, loading, router])
 
   if (loading) {
+    console.log('🔄 AuthGuard: Showing loading spinner')
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
@@ -31,8 +41,10 @@ export function AuthGuard({ children }: AuthGuardProps) {
   }
 
   if (!user) {
+    console.log('❌ AuthGuard: No user, returning null')
     return null
   }
 
+  console.log('✅ AuthGuard: User authenticated, rendering children')
   return <>{children}</>
 }
