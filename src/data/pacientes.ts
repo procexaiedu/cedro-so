@@ -182,8 +182,8 @@ export type PatientOverview = {
     name: string
     email: string
     is_current: boolean
-    start_date: string
-    end_date: string | null
+    started_at: string
+    ended_at: string | null
   }>
   invoices: {
     total: number
@@ -267,6 +267,11 @@ export async function getPatients(
       query = query.or(`full_name.ilike.%${filters.search}%,email.ilike.%${filters.search}%,phone.ilike.%${filters.search}%`)
     }
 
+    // Apply therapist filter from UI dropdown
+    if (filters.therapistId) {
+      query = query.eq('current_therapist_id', filters.therapistId)
+    }
+
     // Apply pagination
     const from = (pagination.page - 1) * pagination.limit
     const to = from + pagination.limit - 1
@@ -283,7 +288,7 @@ export async function getPatients(
     }
 
     const patients: Patient[] = (data || []).map((row: any) => ({
-      id: row.id,
+      id: row.patient_id,
       full_name: row.full_name,
       email: row.email,
       phone: row.phone,
@@ -405,6 +410,7 @@ export async function getPatientById(id: string): Promise<Patient | null> {
  */
 export async function getPatientOverview(id: string): Promise<PatientOverview | null> {
   try {
+    // Get patient basic info
     const patient = await getPatientById(id)
     if (!patient) return null
 
@@ -434,8 +440,8 @@ export async function getPatientOverview(id: string): Promise<PatientOverview | 
       .from('patient_therapist_links')
       .select(`
         therapist_id,
-        start_date,
-        end_date,
+        started_at,
+        ended_at,
         status,
         users!inner (
           name,
@@ -449,8 +455,8 @@ export async function getPatientOverview(id: string): Promise<PatientOverview | 
       name: link.users.name,
       email: link.users.email,
       is_current: link.status === 'active',
-      start_date: link.start_date,
-      end_date: link.end_date
+      started_at: link.started_at,
+      ended_at: link.ended_at
     }))
 
     // Get invoices summary

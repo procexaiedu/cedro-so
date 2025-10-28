@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, memo, useCallback } from 'react'
+import { useState, memo, useCallback, useMemo } from 'react'
 import { AppShell } from '@/components/layout/app-shell'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -47,7 +47,7 @@ export default function AgendaPage() {
   const { user, cedroUser } = useSupabase()
   const { toast } = useToast()
   const [viewMode, setViewMode] = useState<ViewMode>('week')
-  const [currentDate, setCurrentDate] = useState(new Date())
+  const [currentDate, setCurrentDate] = useState(new Date('2025-01-27'))
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date())
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedTherapist, setSelectedTherapist] = useState<string>('')
@@ -83,6 +83,8 @@ export default function AgendaPage() {
   // React Query hooks
   const { startDate, endDate } = getDateRange()
   const therapistId = cedroUser?.role === 'therapist' ? cedroUser.id : undefined
+  
+  console.log('🔍 AgendaPage - Date range:', { startDate, endDate, currentDate })
   
   const { data: appointments = [], isLoading: appointmentsLoading } = useAppointments(
     new Date(startDate),
@@ -141,7 +143,7 @@ export default function AgendaPage() {
     }
   }
 
-  const getFilteredAppointments = () => {
+  const getFilteredAppointments = useMemo(() => {
     return appointments.filter(appointment => {
       const matchesSearch = !debouncedSearchTerm || 
         appointment.patient_name?.toLowerCase().includes(debouncedSearchTerm.toLowerCase()) ||
@@ -151,34 +153,34 @@ export default function AgendaPage() {
       
       return matchesSearch && matchesTherapist
     })
-  }
+  }, [appointments, debouncedSearchTerm, selectedTherapist])
 
-  const getAppointmentsByDate = (date: Date) => {
+  const getAppointmentsByDate = useCallback((date: Date) => {
     const dateStr = format(date, 'yyyy-MM-dd')
-    const filtered = getFilteredAppointments()
-    const dayAppointments = filtered.filter(appointment => 
-      appointment.start_at.startsWith(dateStr)
-    )
+    const dayAppointments = getFilteredAppointments.filter(appointment => {
+      // Parse the start_at string to Date and format it to compare dates
+      const appointmentDate = format(new Date(appointment.start_at), 'yyyy-MM-dd')
+      return appointmentDate === dateStr
+    })
     console.log('🗓️ Getting appointments for date:', { 
       date, 
       dateStr, 
       totalAppointments: appointments.length,
-      filteredAppointments: filtered.length,
+      filteredAppointments: getFilteredAppointments.length,
       dayAppointments: dayAppointments.length,
       appointments: dayAppointments
     })
     return dayAppointments
-  }
+  }, [getFilteredAppointments, appointments.length])
 
-  const getAppointmentStats = () => {
-    const filtered = getFilteredAppointments()
+  const getAppointmentStats = useMemo(() => {
     return {
-      total: filtered.length,
-      scheduled: filtered.filter(a => a.status === 'scheduled').length,
-      completed: filtered.filter(a => a.status === 'completed').length,
-      cancelled: filtered.filter(a => a.status === 'cancelled').length
+      total: getFilteredAppointments.length,
+      scheduled: getFilteredAppointments.filter(a => a.status === 'scheduled').length,
+      completed: getFilteredAppointments.filter(a => a.status === 'completed').length,
+      cancelled: getFilteredAppointments.filter(a => a.status === 'cancelled').length
     }
-  }
+  }, [getFilteredAppointments])
 
   const formatDateHeader = () => {
     switch (viewMode) {
@@ -388,7 +390,7 @@ export default function AgendaPage() {
     )
   }
 
-  const stats = getAppointmentStats()
+  const stats = getAppointmentStats
 
   return (
     <AppShell>

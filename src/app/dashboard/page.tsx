@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { AppShell } from '@/components/layout/app-shell'
 import { useSupabase } from '@/providers/supabase-provider'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -28,6 +29,7 @@ import {
 } from '@/data/dashboard'
 
 export default function DashboardPage() {
+  const router = useRouter()
   const { user, cedroUser } = useSupabase()
   const [stats, setStats] = useState<DashboardStats | null>(null)
   const [proximasConsultas, setProximasConsultas] = useState<ProximaConsulta[]>([])
@@ -212,7 +214,11 @@ export default function DashboardPage() {
                 )}
               </div>
               <div className="mt-4">
-                <Button variant="outline" className="w-full">
+                <Button 
+                  variant="outline" 
+                  className="w-full"
+                  onClick={() => router.push('/agenda')}
+                >
                   Ver todos os agendamentos
                 </Button>
               </div>
@@ -227,15 +233,26 @@ export default function DashboardPage() {
                 <CardTitle>Ações Rápidas</CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
-                <Button className="w-full justify-start">
+                <Button 
+                  className="w-full justify-start"
+                  onClick={() => router.push('/pacientes?new=true')}
+                >
                   <UserPlus className="mr-2 h-4 w-4" />
                   Novo Paciente
                 </Button>
-                <Button variant="outline" className="w-full justify-start">
+                <Button 
+                  variant="outline" 
+                  className="w-full justify-start"
+                  onClick={() => router.push('/agenda')}
+                >
                   <Calendar className="mr-2 h-4 w-4" />
                   Agendar Consulta
                 </Button>
-                <Button variant="outline" className="w-full justify-start">
+                <Button 
+                  variant="outline" 
+                  className="w-full justify-start"
+                  onClick={() => router.push('/financeiro')}
+                >
                   <DollarSign className="mr-2 h-4 w-4" />
                   Registrar Pagamento
                 </Button>

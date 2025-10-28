@@ -8,6 +8,19 @@ export const supabase = createSupabaseClient(supabaseUrl, supabaseAnonKey, {
     persistSession: true,
     autoRefreshToken: true,
   },
+  global: {
+    headers: {
+      'x-client-info': 'cedro-so@1.0.0',
+    },
+  },
+  db: {
+    schema: 'cedro',
+  },
+  realtime: {
+    params: {
+      eventsPerSecond: 10,
+    },
+  },
 })
 
 // Export a function to create new client instances
@@ -16,6 +29,19 @@ export function createClient() {
     auth: {
       persistSession: true,
       autoRefreshToken: true,
+    },
+    global: {
+      headers: {
+        'x-client-info': 'cedro-so@1.0.0',
+      },
+    },
+    db: {
+      schema: 'cedro',
+    },
+    realtime: {
+      params: {
+        eventsPerSecond: 10,
+      },
     },
   })
 }

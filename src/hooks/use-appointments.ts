@@ -4,6 +4,8 @@ import {
   getTherapists,
   getPatients,
   getServices,
+  getLinkedPatients,
+  getLinkedTherapists,
   createAppointment,
   updateAppointment,
   deleteAppointment,
@@ -23,6 +25,8 @@ export const APPOINTMENTS_QUERY_KEYS = {
   therapists: () => ['appointments', 'therapists'] as const,
   patients: () => ['appointments', 'patients'] as const,
   services: () => ['appointments', 'services'] as const,
+  linkedPatients: (therapistId: string) => ['appointments', 'linked-patients', therapistId] as const,
+  linkedTherapists: (patientId: string) => ['appointments', 'linked-therapists', patientId] as const,
 }
 
 // Hook para buscar agendamentos
@@ -65,6 +69,28 @@ export function useServices() {
   })
 }
 
+// Hook para buscar pacientes vinculados a um terapeuta
+export function useLinkedPatients(therapistId: string | null) {
+  return useQuery({
+    queryKey: APPOINTMENTS_QUERY_KEYS.linkedPatients(therapistId || ''),
+    queryFn: () => therapistId ? getLinkedPatients(therapistId) : Promise.resolve([]),
+    enabled: !!therapistId,
+    staleTime: 5 * 60 * 1000, // 5 minutos
+    gcTime: 10 * 60 * 1000, // 10 minutos
+  })
+}
+
+// Hook para buscar terapeutas vinculados a um paciente
+export function useLinkedTherapists(patientId: string | null) {
+  return useQuery({
+    queryKey: APPOINTMENTS_QUERY_KEYS.linkedTherapists(patientId || ''),
+    queryFn: () => patientId ? getLinkedTherapists(patientId) : Promise.resolve([]),
+    enabled: !!patientId,
+    staleTime: 5 * 60 * 1000, // 5 minutos
+    gcTime: 10 * 60 * 1000, // 10 minutos
+  })
+}
+
 // Hook para criar agendamento
 export function useCreateAppointment() {
   const queryClient = useQueryClient()
@@ -73,8 +99,15 @@ export function useCreateAppointment() {
   return useMutation({
     mutationFn: createAppointment,
     onSuccess: () => {
-      // Invalidar queries de agendamentos
+      // Invalidar todas as queries relacionadas a agendamentos
       queryClient.invalidateQueries({ queryKey: APPOINTMENTS_QUERY_KEYS.all })
+      // Invalidar queries de linked patients/therapists para garantir dados atualizados
+      queryClient.invalidateQueries({ queryKey: ['appointments', 'linked-patients'] })
+      queryClient.invalidateQueries({ queryKey: ['appointments', 'linked-therapists'] })
+      // Invalidar listas de pacientes e terapeutas
+      queryClient.invalidateQueries({ queryKey: APPOINTMENTS_QUERY_KEYS.patients() })
+      queryClient.invalidateQueries({ queryKey: APPOINTMENTS_QUERY_KEYS.therapists() })
+      
       toast({
         title: "Sucesso",
         description: "Agendamento criado com sucesso",
@@ -100,7 +133,15 @@ export function useUpdateAppointment() {
     mutationFn: ({ id, data }: { id: string, data: Partial<Appointment> }) => 
       updateAppointment(id, data),
     onSuccess: () => {
+      // Invalidar todas as queries relacionadas a agendamentos
       queryClient.invalidateQueries({ queryKey: APPOINTMENTS_QUERY_KEYS.all })
+      // Invalidar queries de linked patients/therapists para garantir dados atualizados
+      queryClient.invalidateQueries({ queryKey: ['appointments', 'linked-patients'] })
+      queryClient.invalidateQueries({ queryKey: ['appointments', 'linked-therapists'] })
+      // Invalidar listas de pacientes e terapeutas
+      queryClient.invalidateQueries({ queryKey: APPOINTMENTS_QUERY_KEYS.patients() })
+      queryClient.invalidateQueries({ queryKey: APPOINTMENTS_QUERY_KEYS.therapists() })
+      
       toast({
         title: "Sucesso",
         description: "Agendamento atualizado com sucesso",
@@ -125,7 +166,15 @@ export function useDeleteAppointment() {
   return useMutation({
     mutationFn: deleteAppointment,
     onSuccess: () => {
+      // Invalidar todas as queries relacionadas a agendamentos
       queryClient.invalidateQueries({ queryKey: APPOINTMENTS_QUERY_KEYS.all })
+      // Invalidar queries de linked patients/therapists para garantir dados atualizados
+      queryClient.invalidateQueries({ queryKey: ['appointments', 'linked-patients'] })
+      queryClient.invalidateQueries({ queryKey: ['appointments', 'linked-therapists'] })
+      // Invalidar listas de pacientes e terapeutas
+      queryClient.invalidateQueries({ queryKey: APPOINTMENTS_QUERY_KEYS.patients() })
+      queryClient.invalidateQueries({ queryKey: APPOINTMENTS_QUERY_KEYS.therapists() })
+      
       toast({
         title: "Sucesso",
         description: "Agendamento removido com sucesso",

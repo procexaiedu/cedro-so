@@ -1,6 +1,7 @@
 'use client'
 
-import React, { useState, useMemo, memo } from 'react'
+import React, { useState, useMemo, memo, useEffect } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { AppShell } from '@/components/layout/app-shell'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -40,6 +41,7 @@ const limit = 10
 
 export default function PacientesPage() {
   const { cedroUser } = useSupabase()
+  const searchParams = useSearchParams()
   
   // Filter states
   const [filters, setFilters] = useState<PatientFilters>({})
@@ -88,6 +90,14 @@ export default function PacientesPage() {
   if (patientsError) {
     toast.error('Erro ao carregar pacientes')
   }
+
+  // Open new patient modal if 'new' parameter is present
+  useEffect(() => {
+    if (searchParams.get('new') === 'true') {
+      setEditingPatientId(null)
+      setFormOpen(true)
+    }
+  }, [searchParams])
 
   const handleFilterChange = (key: keyof PatientFilters, value: string) => {
     setFilters(prev => ({

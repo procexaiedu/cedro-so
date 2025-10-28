@@ -1,0 +1,147 @@
+{
+  "project_name": "Cedro - Sistema de Atendimento AI para Terapeutas",
+  "project_type": "fullstack_web_application",
+  "tech_stack": {
+    "frontend": {
+      "framework": "Next.js 14.2.15",
+      "language": "TypeScript",
+      "ui_library": "React 18",
+      "styling": "Tailwind CSS",
+      "ui_components": "Radix UI + shadcn/ui",
+      "state_management": "React Query (TanStack Query)",
+      "form_handling": "React Hook Form + Zod",
+      "date_handling": "date-fns",
+      "icons": "Lucide React",
+      "notifications": "Sonner"
+    },
+    "backend": {
+      "runtime": "Node.js",
+      "framework": "Next.js API Routes",
+      "database": "PostgreSQL (Supabase)",
+      "authentication": "Supabase Auth",
+      "file_storage": "MinIO",
+      "ai_integration": "Groq SDK, OpenAI",
+      "workflow_automation": "N8N Integration"
+    },
+    "deployment": {
+      "platform": "Vercel",
+      "region": "gru1 (Brazil)",
+      "build_tool": "Next.js Build System"
+    }
+  },
+  "architecture": {
+    "pattern": "Full-Stack Next.js with API Routes",
+    "database_schema": "cedro",
+    "authentication": "Role-based (admin, therapist)",
+    "file_handling": "MinIO with presigned URLs",
+    "ai_workflow": "N8N webhook integration for audio processing"
+  },
+  "core_modules": {
+    "dashboard": {
+      "description": "Painel principal com estatísticas e visão geral",
+      "features": ["Estatísticas gerais", "Próximas consultas", "Alertas do sistema", "Métricas financeiras"],
+      "files": ["src/app/dashboard/page.tsx", "src/data/dashboard.ts"]
+    },
+    "pacientes": {
+      "description": "Gestão completa de pacientes",
+      "features": ["CRUD de pacientes", "Histórico médico", "Prontuários", "Filtros avançados", "Visualização detalhada"],
+      "files": ["src/app/pacientes/page.tsx", "src/data/pacientes.ts", "src/components/pacientes/"]
+    },
+    "agenda": {
+      "description": "Sistema de agendamento de consultas",
+      "features": ["Calendário interativo", "Agendamento de consultas", "Visualizações (dia/semana/mês)", "Gestão de horários"],
+      "files": ["src/app/agenda/page.tsx", "src/data/agenda.ts", "src/hooks/use-appointments.ts"]
+    },
+    "disponibilidade": {
+      "description": "Gestão de disponibilidade dos terapeutas",
+      "features": ["Configuração de horários", "Exceções de agenda", "Múltiplos horários por dia", "Gestão semanal"],
+      "files": ["src/app/disponibilidade/page.tsx"]
+    },
+    "prontuarios": {
+      "description": "Sistema de prontuários médicos com IA",
+      "features": ["Criação de prontuários", "Processamento de áudio", "Transcrição automática", "Estruturação via IA", "Histórico completo"],
+      "files": ["src/app/prontuarios/page.tsx", "src/lib/audio-processing.ts", "src/hooks/use-audio-processing.ts"]
+    },
+    "financeiro": {
+      "description": "Gestão financeira e faturamento",
+      "features": ["Faturas", "Pagamentos", "Relatórios financeiros", "Integração com gateway", "Status de cobrança"],
+      "files": ["src/app/financeiro/page.tsx", "src/data/financeiro.ts"]
+    },
+    "crm": {
+      "description": "Sistema de CRM para leads e conversões",
+      "features": ["Gestão de leads", "Pipeline de vendas", "Kanban board", "Scoring de leads", "Atividades e histórico"],
+      "files": ["src/app/crm/page.tsx", "src/data/crm.ts", "src/components/crm/"]
+    },
+    "conversas": {
+      "description": "Sistema de conversas e comunicação",
+      "features": ["Chat interno", "Comunicação com pacientes", "Histórico de conversas"],
+      "files": ["src/app/conversas/page.tsx"]
+    }
+  },
+  "database_structure": {
+    "schema": "cedro",
+    "main_tables": [
+      "users (terapeutas e admins)",
+      "patients (pacientes)",
+      "appointments (consultas)",
+      "medical_records (prontuários)",
+      "recording_jobs (processamento de áudio)",
+      "therapist_schedules (disponibilidade)",
+      "invoices (faturas)",
+      "crm_leads (leads do CRM)",
+      "services (serviços oferecidos)",
+      "care_plans (planos de cuidado)",
+      "cerebro (prompts do sistema IA)"
+    ]
+  },
+  "api_endpoints": {
+    "audio_processing": [
+      "/api/audio/upload",
+      "/api/audio/process",
+      "/api/recording-jobs/[id]"
+    ],
+    "n8n_integration": [
+      "/api/n8n/callback"
+    ],
+    "data_management": "Supabase client-side queries"
+  },
+  "ai_integration": {
+    "audio_transcription": "Groq Whisper API",
+    "medical_record_generation": "OpenAI GPT",
+    "workflow_automation": "N8N webhooks",
+    "prompt_management": "Sistema Cerebro (prompts dinâmicos)"
+  },
+  "key_features": {
+    "authentication": "Role-based access control",
+    "real_time": "Supabase real-time subscriptions",
+    "file_upload": "MinIO with presigned URLs",
+    "responsive_design": "Mobile-first with Tailwind CSS",
+    "data_validation": "Zod schemas",
+    "error_handling": "Toast notifications",
+    "performance": "React Query caching, Virtual lists, Lazy loading"
+  },
+  "development_status": {
+    "build_status": "✅ Production ready",
+    "typescript_errors": "✅ None",
+    "eslint_warnings": "⚠️ Minor (safe to ignore)",
+    "deployment": "✅ Configured for Vercel"
+  },
+  "testing_focus_areas": [
+    "Dashboard statistics and data display",
+    "Patient CRUD operations and filtering",
+    "Appointment scheduling and calendar views",
+    "Medical records creation and management",
+    "Financial module invoice handling",
+    "CRM lead management and pipeline",
+    "Authentication and role-based access",
+    "Responsive design across devices",
+    "Data validation and error handling",
+    "Performance optimization features"
+  ],
+  "excluded_from_testing": [
+    "Audio processing and transcription (N8N workflow)",
+    "Conversational AI features",
+    "Patient interaction modules",
+    "Real-time chat functionality"
+  ]
+}

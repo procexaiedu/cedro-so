@@ -31,8 +31,14 @@ export interface DashboardAlert {
 
 export async function getDashboardStats(): Promise<DashboardStats> {
   try {
-    const today = new Date().toISOString().split('T')[0]
-    const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+    const today = new Date()
+    const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate())
+    const endOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1)
+    
+    const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000)
+    const startOfYesterday = new Date(yesterday.getFullYear(), yesterday.getMonth(), yesterday.getDate())
+    const endOfYesterday = new Date(yesterday.getFullYear(), yesterday.getMonth(), yesterday.getDate() + 1)
+    
     const currentMonth = new Date().toISOString().slice(0, 7)
     const lastMonth = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 7)
 
@@ -41,52 +47,58 @@ export async function getDashboardStats(): Promise<DashboardStats> {
       .schema('cedro')
       .from('appointments')
       .select('*', { count: 'exact', head: true })
-      .eq('date', today)
+      .gte('start_at', startOfToday.toISOString())
+      .lt('start_at', endOfToday.toISOString())
 
     // Consultas ontem
     const { count: consultasOntem } = await supabase
       .schema('cedro')
       .from('appointments')
       .select('*', { count: 'exact', head: true })
-      .eq('date', yesterday)
+      .gte('start_at', startOfYesterday.toISOString())
+      .lt('start_at', endOfYesterday.toISOString())
 
     // Pacientes ativos (com consultas nos últimos 30 dias)
-    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
     const { data: pacientesAtivos } = await supabase
       .schema('cedro')
       .from('appointments')
       .select('patient_id')
-      .gte('date', thirtyDaysAgo)
+      .gte('start_at', thirtyDaysAgo.toISOString())
 
     const uniquePacientesAtivos = new Set(pacientesAtivos?.map(a => a.patient_id) || []).size
 
     // Pacientes ativos mês passado
-    const sixtyDaysAgo = new Date(Date.now() - 60 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+    const sixtyDaysAgo = new Date(Date.now() - 60 * 24 * 60 * 60 * 1000)
     const { data: pacientesAtivosMesPassado } = await supabase
       .schema('cedro')
       .from('appointments')
       .select('patient_id')
-      .gte('date', sixtyDaysAgo)
-      .lt('date', thirtyDaysAgo)
+      .gte('start_at', sixtyDaysAgo.toISOString())
+      .lt('start_at', thirtyDaysAgo.toISOString())
 
     const uniquePacientesAtivosMesPassado = new Set(pacientesAtivosMesPassado?.map(a => a.patient_id) || []).size
 
     // Receita mensal (simulada - você pode implementar com dados reais de pagamentos)
     const { data: invoicesThisMonth } = await supabase
+      .schema('cedro')
       .from('invoices')
-      .select('amount')
-      .like('created_at', `${currentMonth}%`)
+      .select('amount_cents')
+      .gte('created_at', `${currentMonth}-01`)
+      .lt('created_at', `${currentMonth === '2025-12' ? '2026-01' : currentMonth.slice(0, 5) + String(parseInt(currentMonth.slice(5)) + 1).padStart(2, '0')}-01`)
       .eq('status', 'paid')
 
-    const receitaMensal = invoicesThisMonth?.reduce((sum, invoice) => sum + (invoice.amount || 0), 0) || 0
+    const receitaMensal = invoicesThisMonth?.reduce((sum, invoice) => sum + (invoice.amount_cents || 0), 0) || 0
 
     const { data: invoicesLastMonth } = await supabase
+      .schema('cedro')
       .from('invoices')
-      .select('amount')
-      .like('created_at', `${lastMonth}%`)
+      .select('amount_cents')
+      .gte('created_at', `${lastMonth}-01`)
+      .lt('created_at', `${lastMonth === '2025-12' ? '2026-01' : lastMonth.slice(0, 5) + String(parseInt(lastMonth.slice(5)) + 1).padStart(2, '0')}-01`)
       .eq('status', 'paid')
 
-    const receitaMesPassado = invoicesLastMonth?.reduce((sum, invoice) => sum + (invoice.amount || 0), 0) || 0
+    const receitaMesPassado = invoicesLastMonth?.reduce((sum, invoice) => sum + (invoice.amount_cents || 0), 0) || 0
 
     // Taxa de ocupação (simulada - baseada em consultas vs slots disponíveis)
     const { count: totalSlots } = await supabase
@@ -183,17 +195,19 @@ export async function getProximasConsultas(): Promise<ProximaConsulta[]> {
 export async function getDashboardAlerts(): Promise<DashboardAlert[]> {
   try {
     const alerts: DashboardAlert[] = []
-    const today = new Date().toISOString().split('T')[0]
     const now = new Date()
-    const currentTime = now.toTimeString().slice(0, 5)
+    const today = new Date()
+    const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate())
+    const endOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1)
 
     // Verificar consultas em atraso
     const { data: lateAppointments } = await supabase
       .schema('cedro')
       .from('appointments')
       .select('id')
-      .eq('date', today)
-      .lt('start_time', currentTime)
+      .gte('start_at', startOfToday.toISOString())
+      .lt('start_at', endOfToday.toISOString())
+      .lt('start_at', now.toISOString())
       .neq('status', 'completed')
 
     if (lateAppointments && lateAppointments.length > 0) {

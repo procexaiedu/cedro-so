@@ -53,6 +53,12 @@ export async function getAppointments(
   therapistId?: string
 ): Promise<Appointment[]> {
   try {
+    console.log('🔍 getAppointments called with:', {
+      startDate: startDate.toISOString(),
+      endDate: endDate.toISOString(),
+      therapistId
+    })
+
     // Use the optimized view for better performance
     let query = supabase
       .schema('cedro')
@@ -67,6 +73,12 @@ export async function getAppointments(
     }
 
     const { data, error } = await query
+
+    console.log('📊 Query result:', { 
+      data: data?.length || 0, 
+      error: error?.message,
+      firstItem: data?.[0]
+    })
 
     if (error) {
       console.error('Error fetching appointments:', error)

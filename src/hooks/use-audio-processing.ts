@@ -1,4 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
+import { supabase } from '@/lib/supabase'
+import { fetchWithTimeout, pollUntilCondition, NETWORK_CONFIG } from '@/lib/network-config'
 
 export interface AudioProcessingStatus {
   id: string
@@ -37,6 +39,7 @@ export function useAudioProcessing(recordingJobId: string | null) {
   const [status, setStatus] = useState<AudioProcessingStatus | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [pollingAttempts, setPollingAttempts] = useState(0)
 
   const fetchStatus = useCallback(async () => {
     if (!recordingJobId) return
@@ -45,37 +48,80 @@ export function useAudioProcessing(recordingJobId: string | null) {
       setLoading(true)
       setError(null)
 
-      const response = await fetch(`/api/audio/status/${recordingJobId}`)
+      const response = await fetchWithTimeout(`/api/audio/status/${recordingJobId}`, {
+        timeout: NETWORK_CONFIG.POLLING_TIMEOUT
+      })
       
       if (!response.ok) {
-        throw new Error('Erro ao buscar status do processamento')
+        throw new Error(`Failed to fetch status: ${response.statusText}`)
       }
 
       const data = await response.json()
       setStatus(data)
-
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erro desconhecido')
+      console.error('Error fetching audio processing status:', err)
+      
+      const errorMessage = err instanceof Error ? err.message : 'Unknown error'
+      setError(errorMessage)
     } finally {
       setLoading(false)
     }
   }, [recordingJobId])
 
+  // Polling effect with improved timeout and retry logic
   useEffect(() => {
     if (!recordingJobId) return
 
-    // Initial fetch
-    fetchStatus()
+    let isPolling = false
+    let timeoutId: NodeJS.Timeout
 
-    // Poll for updates every 3 seconds if not completed
-    const interval = setInterval(() => {
-      if (status?.status !== 'completed' && status?.status !== 'error') {
-        fetchStatus()
+    const startPolling = async () => {
+      if (isPolling) return
+      isPolling = true
+      setPollingAttempts(0)
+
+      try {
+        // Use the new polling utility
+        await pollUntilCondition(
+          async () => {
+            setPollingAttempts(prev => prev + 1)
+            return await fetchStatus()
+          },
+          (result) => {
+            // Stop polling when status is completed, error, or result is null (error occurred)
+            return result === null || result?.status === 'completed' || result?.status === 'error'
+          },
+          NETWORK_CONFIG.POLLING_INTERVAL,
+          NETWORK_CONFIG.MAX_POLLING_ATTEMPTS
+        )
+      } catch (error) {
+        console.error('Polling timeout or max attempts reached:', error)
+        setError('Audio processing is taking longer than expected. Please refresh the page.')
+      } finally {
+        isPolling = false
       }
-    }, 3000)
+    }
 
-    return () => clearInterval(interval)
-  }, [recordingJobId, fetchStatus, status?.status])
+    // Only start polling if status is not in a final state
+    if (!status || (status.status !== 'completed' && status.status !== 'error')) {
+      // Add a small delay to prevent immediate polling on mount
+      timeoutId = setTimeout(startPolling, 1000)
+    }
+
+    return () => {
+      isPolling = false
+      if (timeoutId) {
+        clearTimeout(timeoutId)
+      }
+    }
+  }, [recordingJobId, fetchStatus]) // Removed status?.status from dependencies to avoid circular updates
+
+  // Log when audio processing reaches final state
+  useEffect(() => {
+    if (status?.status === 'completed' || status?.status === 'error') {
+      console.log('Audio processing finished with status:', status.status, 'after', pollingAttempts, 'attempts')
+    }
+  }, [status?.status, pollingAttempts])
 
   const isCompleted = status?.status === 'completed'
   const isError = status?.status === 'error'
@@ -88,6 +134,7 @@ export function useAudioProcessing(recordingJobId: string | null) {
     isCompleted,
     isError,
     isProcessing,
+    pollingAttempts,
     refetch: fetchStatus
   }
 }

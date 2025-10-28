@@ -1,0 +1,106 @@
+[
+  {
+    "id": "TC001",
+    "title": "Dashboard - Carregamento e Estatísticas",
+    "description": "Verificar se o dashboard carrega corretamente e exibe estatísticas principais do sistema",
+    "steps": [
+      "Acessar a página de login com credenciais: contato@procexai.tech / ProcexAI1010!",
+      "Navegar para o dashboard principal",
+      "Verificar se as estatísticas são carregadas corretamente",
+      "Validar se não há erros de console",
+      "Confirmar que todos os widgets do dashboard estão funcionais"
+    ]
+  },
+  {
+    "id": "TC002",
+    "title": "Pacientes - CRUD Completo",
+    "description": "Testar criação, leitura, atualização e exclusão de pacientes no sistema",
+    "steps": [
+      "Fazer login no sistema",
+      "Navegar para o módulo de Pacientes",
+      "Testar criação de novo paciente",
+      "Verificar listagem de pacientes existentes",
+      "Testar edição de dados de paciente",
+      "Validar filtros e busca de pacientes",
+      "Confirmar que não há erros durante as operações"
+    ]
+  },
+  {
+    "id": "TC003",
+    "title": "Agenda - Visualização e Agendamento",
+    "description": "Verificar calendário e funcionalidades de agendamento de consultas",
+    "steps": [
+      "Acessar o módulo de Agenda",
+      "Verificar carregamento do calendário",
+      "Testar visualização de agendamentos existentes",
+      "Validar navegação entre datas",
+      "Verificar responsividade do calendário",
+      "Confirmar que eventos são exibidos corretamente"
+    ]
+  },
+  {
+    "id": "TC004",
+    "title": "Prontuários - Gestão de Registros Médicos",
+    "description": "Testar criação e visualização de prontuários médicos digitais",
+    "steps": [
+      "Navegar para o módulo de Prontuários",
+      "Verificar listagem de prontuários existentes",
+      "Testar criação de novo prontuário",
+      "Validar campos obrigatórios",
+      "Verificar funcionalidades de busca e filtro",
+      "Confirmar integridade dos dados salvos"
+    ]
+  },
+  {
+    "id": "TC005",
+    "title": "Financeiro - Gestão de Faturas",
+    "description": "Verificar funcionalidades de gestão financeira e faturamento",
+    "steps": [
+      "Acessar módulo Financeiro",
+      "Verificar listagem de faturas",
+      "Testar filtros por período e status",
+      "Validar cálculos financeiros",
+      "Verificar relatórios financeiros",
+      "Confirmar que dados são consistentes"
+    ]
+  },
+  {
+    "id": "TC006",
+    "title": "CRM - Gestão de Leads",
+    "description": "Testar funcionalidades do sistema CRM e pipeline de leads",
+    "steps": [
+      "Navegar para o módulo CRM",
+      "Verificar listagem de leads",
+      "Testar criação de novo lead",
+      "Validar pipeline de vendas",
+      "Verificar estatísticas do CRM",
+      "Confirmar funcionalidades de follow-up"
+    ]
+  },
+  {
+    "id": "TC007",
+    "title": "Disponibilidade - Gestão de Horários",
+    "description": "Verificar gestão de disponibilidade dos terapeutas",
+    "steps": [
+      "Acessar módulo de Disponibilidade",
+      "Verificar visualização de horários",
+      "Testar definição de disponibilidade",
+      "Validar exceções de agenda",
+      "Verificar conflitos de horário",
+      "Confirmar salvamento de configurações"
+    ]
+  },
+  {
+    "id": "TC008",
+    "title": "Navegação - Fluxo entre Módulos",
+    "description": "Testar navegação e consistência entre diferentes módulos do sistema",
+    "steps": [
+      "Testar navegação via menu lateral",
+      "Verificar breadcrumbs e navegação",
+      "Validar consistência de layout",
+      "Testar responsividade em diferentes telas",
+      "Verificar performance de carregamento",
+      "Confirmar que não há quebras de interface"
+    ]
+  }
+]

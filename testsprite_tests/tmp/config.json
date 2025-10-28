@@ -1,0 +1,18 @@
+{
+  "status": "commited",
+  "type": "frontend",
+  "scope": "codebase",
+  "localEndpoint": "http://localhost:3000",
+  "loginUser": "contato@procexai.tech",
+  "loginPassword": "ProcexAI1010!",
+  "executionArgs": {
+    "projectName": "cedro-so",
+    "projectPath": "d:\\cedro\\cedro-so",
+    "testIds": [],
+    "additionalInstruction": "Executar testes completos do sistema Cedro com login: contato@procexai.tech / ProcexAI1010! - Focar nos módulos principais: Dashboard, Pacientes, Agenda, Prontuários, Financeiro, CRM e Disponibilidade. Excluir: interação com pacientes, aspectos conversacionais, processamento de áudio.",
+    "envs": {
+      "API_KEY": "sk-user-Y8FB1eTmXsayOjwHTx9kC2yARz7YV1i0iLteaWUr7wjKDi4_0YZqXu9S9PvKWIaH4SAG91HkhRBm_1R4_GI89E_lRrTEiR-2dMzMdj7vmqKAHKVXhwBEps_57fDFeARcVAM"
+    }
+  },
+  "proxy": "http://cc9520af-4690-415a-8548-e30da7d62132:1RpkwubGoxDqzRWiV9DMmXKRmmWXHTbR@tun.testsprite.com:8080"
+}

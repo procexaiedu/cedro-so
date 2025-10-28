@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -25,12 +26,14 @@ import {
   Save,
   X,
   Volume2,
-  Download
+  Download,
+  Plus
 } from 'lucide-react'
 import { createMedicalRecord, type CreateMedicalRecordData, type MedicalRecordType, type MedicalRecordVisibility, type MedicalRecordWithLegacyFields, getMedicalRecordTypeLabel } from '@/data/pacientes'
 import { useSupabase } from '@/providers/supabase-provider'
 import { getPatients, type Patient } from '@/data/pacientes'
 import { AudioProcessingStatus } from './audio-processing-status'
+import { fetchWithTimeout, NETWORK_CONFIG } from '@/lib/network-config'
 
 interface NewRecordModalProps {
   open: boolean
@@ -55,6 +58,7 @@ export function NewRecordModal({
 }: NewRecordModalProps) {
   const { toast } = useToast()
   const { cedroUser } = useSupabase()
+  const router = useRouter()
   const [patients, setPatients] = useState<Patient[]>([])
   const [selectedPatientId, setSelectedPatientId] = useState(preselectedPatientId || '')
   const [appointmentId, setAppointmentId] = useState(preselectedAppointmentId || '')
@@ -451,9 +455,10 @@ export function NewRecordModal({
         formData.append('appointment_id', appointmentId)
       }
 
-      const uploadResponse = await fetch('/api/audio/upload', {
+      const uploadResponse = await fetchWithTimeout('/api/audio/upload', {
         method: 'POST',
-        body: formData
+        body: formData,
+        timeout: NETWORK_CONFIG.UPLOAD_TIMEOUT
       })
 
       if (!uploadResponse.ok) {
@@ -464,14 +469,15 @@ export function NewRecordModal({
       const recordingJobId = uploadData.recording_job_id
 
       // Process the uploaded audio
-      const processResponse = await fetch('/api/audio/process', {
+      const processResponse = await fetchWithTimeout('/api/audio/process', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
           recording_job_id: recordingJobId
-        })
+        }),
+        timeout: NETWORK_CONFIG.DEFAULT_TIMEOUT
       })
 
       if (!processResponse.ok) {
@@ -615,9 +621,10 @@ export function NewRecordModal({
         
         console.log('📤 Enviando FormData para /api/audio/upload')
 
-        const uploadResponse = await fetch('/api/audio/upload', {
+        const uploadResponse = await fetchWithTimeout('/api/audio/upload', {
           method: 'POST',
-          body: formData
+          body: formData,
+          timeout: NETWORK_CONFIG.UPLOAD_TIMEOUT
         })
 
         console.log('📋 Resposta do upload:')
@@ -711,19 +718,41 @@ export function NewRecordModal({
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="patient">Paciente *</Label>
-              <Select value={selectedPatientId} onValueChange={setSelectedPatientId}>
+              <Select 
+                value={selectedPatientId || ""} 
+                onValueChange={(value) => setSelectedPatientId(value)}
+              >
                 <SelectTrigger>
                   <SelectValue placeholder="Selecione um paciente" />
                 </SelectTrigger>
                 <SelectContent>
-                  {Array.isArray(patients) && patients.map((patient) => (
-                    <SelectItem key={patient.id} value={patient.id}>
-                      <div className="flex items-center gap-2">
-                        <User className="h-4 w-4" />
-                        {patient.full_name}
-                      </div>
-                    </SelectItem>
-                  ))}
+                  {Array.isArray(patients) && patients.length > 0 ? (
+                    patients.map((patient) => (
+                      <SelectItem key={`patient-${patient.id}`} value={patient.id}>
+                        <div className="flex items-center gap-2">
+                          <User className="h-4 w-4" />
+                          {patient.full_name}
+                        </div>
+                      </SelectItem>
+                    ))
+                  ) : (
+                    <div key="no-patients" className="p-4 text-center space-y-3">
+                      <p className="text-sm text-muted-foreground">
+                        Nenhum paciente encontrado
+                      </p>
+                      <Button
+                        size="sm"
+                        onClick={() => {
+                          onOpenChange(false)
+                          router.push('/pacientes')
+                        }}
+                        className="gap-2"
+                      >
+                        <Plus className="h-4 w-4" />
+                        Cadastrar Paciente
+                      </Button>
+                    </div>
+                  )}
                 </SelectContent>
               </Select>
             </div>
@@ -781,10 +810,10 @@ export function NewRecordModal({
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="anamnesis">Anamnese</SelectItem>
-                      <SelectItem value="soap">SOAP</SelectItem>
-                      <SelectItem value="evolution">Evolução</SelectItem>
-                      <SelectItem value="prescription_draft">Prescrição</SelectItem>
+                      <SelectItem key="record-type-anamnesis" value="anamnesis">Anamnese</SelectItem>
+                      <SelectItem key="record-type-soap" value="soap">SOAP</SelectItem>
+                      <SelectItem key="record-type-evolution" value="evolution">Evolução</SelectItem>
+                      <SelectItem key="record-type-prescription" value="prescription_draft">Prescrição</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -796,8 +825,8 @@ export function NewRecordModal({
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="private">Privado</SelectItem>
-                      <SelectItem value="shared">Compartilhado</SelectItem>
+                      <SelectItem key="visibility-private" value="private">Privado</SelectItem>
+                      <SelectItem key="visibility-shared" value="shared">Compartilhado</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>

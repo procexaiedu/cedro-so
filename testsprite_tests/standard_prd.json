@@ -1,0 +1,166 @@
+{
+  "product_name": "Sistema Cedro",
+  "product_description": "Plataforma de Atendimento AI para Terapeutas - Sistema completo de gestão clínica com integração de IA para processamento de prontuários médicos",
+  "version": "1.0.0",
+  "target_users": [
+    "Terapeutas",
+    "Administradores de clínicas",
+    "Recepcionistas",
+    "Gestores financeiros"
+  ],
+  "main_objectives": [
+    "Digitalizar e otimizar o atendimento terapêutico",
+    "Automatizar processos administrativos",
+    "Integrar IA para análise de prontuários",
+    "Centralizar gestão de pacientes e agendamentos",
+    "Facilitar controle financeiro e CRM"
+  ],
+  "core_features": [
+    {
+      "name": "Dashboard",
+      "description": "Visão geral do sistema com estatísticas e métricas principais",
+      "priority": "high",
+      "user_stories": [
+        "Como terapeuta, quero ver um resumo das minhas consultas do dia",
+        "Como administrador, quero visualizar métricas gerais da clínica"
+      ]
+    },
+    {
+      "name": "Gestão de Pacientes",
+      "description": "CRUD completo para gerenciamento de informações dos pacientes",
+      "priority": "high",
+      "user_stories": [
+        "Como terapeuta, quero cadastrar novos pacientes",
+        "Como recepcionista, quero buscar e editar informações de pacientes"
+      ]
+    },
+    {
+      "name": "Sistema de Agendamento",
+      "description": "Calendário interativo para agendamento e gestão de consultas",
+      "priority": "high",
+      "user_stories": [
+        "Como terapeuta, quero visualizar minha agenda em formato de calendário",
+        "Como recepcionista, quero agendar consultas para os pacientes"
+      ]
+    },
+    {
+      "name": "Prontuários Médicos com IA",
+      "description": "Sistema de prontuários com processamento automático via IA",
+      "priority": "high",
+      "user_stories": [
+        "Como terapeuta, quero criar prontuários médicos digitais",
+        "Como terapeuta, quero que a IA processe automaticamente áudios das consultas"
+      ]
+    },
+    {
+      "name": "Gestão Financeira",
+      "description": "Controle de faturamento, pagamentos e relatórios financeiros",
+      "priority": "high",
+      "user_stories": [
+        "Como administrador, quero gerar faturas para os pacientes",
+        "Como gestor financeiro, quero visualizar relatórios de receita"
+      ]
+    },
+    {
+      "name": "Sistema CRM",
+      "description": "Gestão de leads e pipeline de vendas",
+      "priority": "medium",
+      "user_stories": [
+        "Como vendedor, quero gerenciar leads potenciais",
+        "Como administrador, quero acompanhar o pipeline de conversão"
+      ]
+    },
+    {
+      "name": "Gestão de Disponibilidade",
+      "description": "Controle de horários e disponibilidade dos terapeutas",
+      "priority": "medium",
+      "user_stories": [
+        "Como terapeuta, quero definir minha disponibilidade",
+        "Como administrador, quero visualizar a disponibilidade de todos os terapeutas"
+      ]
+    }
+  ],
+  "technical_requirements": {
+    "frontend": "Next.js 14 com TypeScript",
+    "backend": "Next.js API Routes",
+    "database": "PostgreSQL via Supabase",
+    "storage": "MinIO para arquivos",
+    "ai_integration": "OpenAI e Groq SDK",
+    "automation": "N8N para workflows",
+    "styling": "Tailwind CSS + shadcn/ui",
+    "state_management": "React Query (TanStack Query)",
+    "authentication": "Supabase Auth"
+  },
+  "performance_requirements": {
+    "page_load_time": "< 3 segundos",
+    "api_response_time": "< 1 segundo",
+    "concurrent_users": "50+ usuários simultâneos",
+    "uptime": "99.5%"
+  },
+  "security_requirements": [
+    "Autenticação obrigatória para todas as funcionalidades",
+    "Controle de acesso baseado em roles",
+    "Criptografia de dados sensíveis",
+    "Compliance com LGPD para dados médicos",
+    "Backup automático de dados"
+  ],
+  "user_flows": [
+    {
+      "name": "Login e Acesso ao Dashboard",
+      "steps": [
+        "Usuário acessa a página de login",
+        "Insere credenciais válidas",
+        "É redirecionado para o dashboard",
+        "Visualiza estatísticas e informações relevantes"
+      ]
+    },
+    {
+      "name": "Cadastro de Novo Paciente",
+      "steps": [
+        "Acessa módulo de Pacientes",
+        "Clica em 'Novo Paciente'",
+        "Preenche formulário com dados pessoais",
+        "Salva e confirma cadastro"
+      ]
+    },
+    {
+      "name": "Agendamento de Consulta",
+      "steps": [
+        "Acessa módulo de Agenda",
+        "Seleciona data e horário disponível",
+        "Escolhe paciente e terapeuta",
+        "Confirma agendamento"
+      ]
+    }
+  ],
+  "success_metrics": [
+    "Redução de 50% no tempo de cadastro de pacientes",
+    "Aumento de 30% na eficiência de agendamentos",
+    "Diminuição de 40% em erros administrativos",
+    "Satisfação do usuário > 4.5/5.0"
+  ],
+  "out_of_scope": [
+    "Interação direta com pacientes via chat",
+    "Processamento de áudio em tempo real",
+    "Telemedicina/videochamadas",
+    "Integração com sistemas externos de terceiros",
+    "Aplicativo móvel nativo"
+  ],
+  "development_phases": [
+    {
+      "phase": "MVP",
+      "features": ["Dashboard", "Pacientes", "Agenda", "Autenticação"],
+      "timeline": "2 meses"
+    },
+    {
+      "phase": "Fase 2",
+      "features": ["Prontuários", "Financeiro", "IA Integration"],
+      "timeline": "3 meses"
+    },
+    {
+      "phase": "Fase 3",
+      "features": ["CRM", "Disponibilidade", "Relatórios Avançados"],
+      "timeline": "2 meses"
+    }
+  ]
+}

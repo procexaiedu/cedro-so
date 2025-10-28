@@ -15,14 +15,15 @@ import { format, parseISO, addMinutes } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { useToast } from '@/hooks/use-toast'
 import { 
-  createAppointment, 
-  updateAppointment, 
-  deleteAppointment,
-  getLinkedPatients,
-  getLinkedTherapists,
-  isPatientLinkedToTherapist,
+  useCreateAppointment,
+  useUpdateAppointment,
+  useDeleteAppointment,
+  useLinkedPatients,
+  useLinkedTherapists,
   type Appointment 
-} from '@/data/agenda'
+} from '@/hooks/use-appointments'
+import { useRefreshOnModalOpen } from '@/hooks/use-realtime-appointments'
+import { isPatientLinkedToTherapist } from '@/data/agenda'
 
 type AppointmentModalProps = {
   isOpen: boolean
@@ -59,7 +60,6 @@ export function AppointmentModal({
   cedroUser
 }: AppointmentModalProps) {
   const { toast } = useToast()
-  const [loading, setLoading] = useState(false)
   const [filteredPatients, setFilteredPatients] = useState(patients)
   const [filteredTherapists, setFilteredTherapists] = useState(therapists)
   const [formData, setFormData] = useState({
@@ -73,9 +73,34 @@ export function AppointmentModal({
     notes: ''
   })
 
+  // Definir variáveis de modo primeiro
   const isReadOnly = mode === 'view'
   const isEditing = mode === 'edit'
   const isCreating = mode === 'create'
+
+  // React Query hooks para mutations
+  const createMutation = useCreateAppointment()
+  const updateMutation = useUpdateAppointment()
+  const deleteMutation = useDeleteAppointment()
+
+  // Hook para refresh automático de dados
+  const { refreshAppointmentData } = useRefreshOnModalOpen()
+
+  // React Query hooks para dados linkados
+  const { data: linkedPatients, isLoading: loadingLinkedPatients } = useLinkedPatients(
+    formData.therapist_id && isCreating ? formData.therapist_id : null
+  )
+  
+  const { data: linkedTherapists, isLoading: loadingLinkedTherapists } = useLinkedTherapists(
+    formData.patient_id && isCreating ? formData.patient_id : null
+  )
+
+  // Refresh data when modal opens
+  useEffect(() => {
+    if (isOpen) {
+      refreshAppointmentData()
+    }
+  }, [isOpen, refreshAppointmentData])
 
   // Initialize filtered states when props change
   useEffect(() => {
@@ -123,61 +148,46 @@ export function AppointmentModal({
     }
   }, [appointment, mode, defaultDate, defaultTime, isEditing, isCreating, cedroUser])
 
-  // Filter patients based on selected therapist
+  // Filter patients based on selected therapist using React Query data
   useEffect(() => {
-    const loadLinkedPatients = async () => {
-      if (formData.therapist_id && isCreating) {
-        try {
-          const linkedPatients = await getLinkedPatients(formData.therapist_id)
-          setFilteredPatients(linkedPatients)
-          
-          // Clear patient selection if current patient is not linked to the new therapist
-          if (formData.patient_id) {
-            const isLinked = linkedPatients.some(p => p.id === formData.patient_id)
-            if (!isLinked) {
-              setFormData(prev => ({ ...prev, patient_id: '' }))
-            }
-          }
-        } catch (error) {
-          console.error('Error loading linked patients:', error)
-          setFilteredPatients([])
+    if (formData.therapist_id && isCreating && linkedPatients) {
+      setFilteredPatients(linkedPatients)
+      
+      // Clear patient selection if current patient is not linked to the new therapist
+      if (formData.patient_id) {
+        const isLinked = linkedPatients.some(p => p.id === formData.patient_id)
+        if (!isLinked) {
+          setFormData(prev => ({ ...prev, patient_id: '' }))
         }
-      } else {
-        // If no therapist selected or not creating, show all patients
-        setFilteredPatients(patients)
       }
+    } else if (!formData.therapist_id || !isCreating) {
+      // If no therapist selected or not creating, show all patients
+      setFilteredPatients(patients)
     }
+  }, [formData.therapist_id, isCreating, linkedPatients, patients, formData.patient_id])
 
-    loadLinkedPatients()
-  }, [formData.therapist_id, isCreating, patients])
-
-  // Filter therapists based on selected patient
+  // Filter therapists based on selected patient using React Query data
   useEffect(() => {
-    const loadLinkedTherapists = async () => {
-      if (formData.patient_id && isCreating) {
-        try {
-          const linkedTherapists = await getLinkedTherapists(formData.patient_id)
-          setFilteredTherapists(linkedTherapists)
-          
-          // Clear therapist selection if current therapist is not linked to the new patient
-          if (formData.therapist_id) {
-            const isLinked = linkedTherapists.some(t => t.id === formData.therapist_id)
-            if (!isLinked) {
-              setFormData(prev => ({ ...prev, therapist_id: '' }))
-            }
-          }
-        } catch (error) {
-          console.error('Error loading linked therapists:', error)
-          setFilteredTherapists([])
+    if (formData.patient_id && isCreating && linkedTherapists) {
+      setFilteredTherapists(linkedTherapists)
+      
+      // Clear therapist selection if current therapist is not linked to the new patient
+      if (formData.therapist_id) {
+        const isLinked = linkedTherapists.some(t => t.id === formData.therapist_id)
+        if (!isLinked) {
+          setFormData(prev => ({ ...prev, therapist_id: '' }))
         }
+      }
+    } else if (!formData.patient_id || !isCreating) {
+      // If no patient selected or not creating, show all therapists based on user role
+      if (cedroUser?.role === 'therapist') {
+        const currentTherapist = therapists.find(t => t.id === cedroUser.id)
+        setFilteredTherapists(currentTherapist ? [currentTherapist] : [])
       } else {
-        // If no patient selected or not creating, show all therapists
         setFilteredTherapists(therapists)
       }
     }
-
-    loadLinkedTherapists()
-  }, [formData.patient_id, isCreating, therapists])
+  }, [formData.patient_id, isCreating, linkedTherapists, therapists, formData.therapist_id, cedroUser])
 
   const handleServiceChange = (serviceId: string) => {
     const service = services.find(s => s.id === serviceId)
@@ -189,110 +199,77 @@ export function AppointmentModal({
   }
 
   const handleSave = async () => {
-    try {
-      setLoading(true)
+    // Validation
+    if (!formData.patient_id || !formData.therapist_id) {
+      toast({
+        title: "Erro",
+        description: "Paciente e terapeuta são obrigatórios",
+        variant: "destructive"
+      })
+      return
+    }
 
-      // Validation
-      if (!formData.patient_id || !formData.therapist_id) {
+    // Check if patient is linked to therapist (only for new appointments)
+    if (isCreating) {
+      const isLinked = await isPatientLinkedToTherapist(formData.patient_id, formData.therapist_id)
+      if (!isLinked) {
         toast({
           title: "Erro",
-          description: "Paciente e terapeuta são obrigatórios",
+          description: "Este paciente não está vinculado ao terapeuta selecionado",
           variant: "destructive"
         })
         return
       }
+    }
 
-      // Check if patient is linked to therapist (only for new appointments)
-      if (isCreating) {
-        const isLinked = await isPatientLinkedToTherapist(formData.patient_id, formData.therapist_id)
-        if (!isLinked) {
-          toast({
-            title: "Erro",
-            description: "Este paciente não está vinculado ao terapeuta selecionado",
-            variant: "destructive"
-          })
-          return
+    // Calculate start and end times
+    const [hours, minutes] = formData.start_time.split(':').map(Number)
+    const startDateTime = new Date(formData.date)
+    startDateTime.setHours(hours, minutes, 0, 0)
+    
+    const endDateTime = addMinutes(startDateTime, formData.duration)
+
+    const appointmentData = {
+      patient_id: formData.patient_id,
+      therapist_id: formData.therapist_id,
+      service_id: formData.service_id || undefined,
+      start_at: startDateTime.toISOString(),
+      end_at: endDateTime.toISOString(),
+      notes: formData.notes || undefined
+    }
+
+    if (isCreating) {
+      createMutation.mutate(appointmentData, {
+        onSuccess: () => {
+          onSave()
+          onClose()
         }
-      }
-
-      // Calculate start and end times
-      const [hours, minutes] = formData.start_time.split(':').map(Number)
-      const startDateTime = new Date(formData.date)
-      startDateTime.setHours(hours, minutes, 0, 0)
-      
-      const endDateTime = addMinutes(startDateTime, formData.duration)
-
-      const appointmentData = {
-        patient_id: formData.patient_id,
-        therapist_id: formData.therapist_id,
-        service_id: formData.service_id || undefined,
-        start_at: startDateTime.toISOString(),
-        end_at: endDateTime.toISOString(),
-        notes: formData.notes || undefined
-      }
-
-      let success = false
-
-      if (isCreating) {
-        const result = await createAppointment(appointmentData)
-        success = !!result
-      } else if (isEditing && appointment) {
-        const result = await updateAppointment(appointment.id, {
+      })
+    } else if (isEditing && appointment) {
+      updateMutation.mutate({
+        id: appointment.id,
+        data: {
           ...appointmentData,
           status: formData.status
-        })
-        success = !!result
-      }
-
-      if (success) {
-        toast({
-          title: "Sucesso",
-          description: isCreating ? "Agendamento criado com sucesso" : "Agendamento atualizado com sucesso"
-        })
-        onSave()
-        onClose()
-      } else {
-        throw new Error('Failed to save appointment')
-      }
-    } catch (error) {
-      console.error('Error saving appointment:', error)
-      toast({
-        title: "Erro",
-        description: "Não foi possível salvar o agendamento",
-        variant: "destructive"
+        }
+      }, {
+        onSuccess: () => {
+          onSave()
+          onClose()
+        }
       })
-    } finally {
-      setLoading(false)
     }
   }
 
   const handleDelete = async () => {
     if (!appointment) return
 
-    try {
-      setLoading(true)
-      const success = await deleteAppointment(appointment.id)
-      
-      if (success) {
-        toast({
-          title: "Sucesso",
-          description: "Agendamento excluído com sucesso"
-        })
+    deleteMutation.mutate(appointment.id, {
+      onSuccess: () => {
         onSave()
         onClose()
-      } else {
-        throw new Error('Failed to delete appointment')
       }
-    } catch (error) {
-      console.error('Error deleting appointment:', error)
-      toast({
-        title: "Erro",
-        description: "Não foi possível excluir o agendamento",
-        variant: "destructive"
-      })
-    } finally {
-      setLoading(false)
-    }
+    })
   }
 
   const getModalTitle = () => {
@@ -524,25 +501,32 @@ export function AppointmentModal({
               <Button
                 variant="destructive"
                 onClick={handleDelete}
-                disabled={loading}
+                disabled={deleteMutation.isPending}
                 className="flex items-center gap-2"
               >
                 <Trash2 className="h-4 w-4" />
-                Excluir
+                {deleteMutation.isPending ? 'Excluindo...' : 'Excluir'}
               </Button>
             )}
           </div>
           
           <div className="flex gap-2">
-            <Button variant="outline" onClick={onClose} disabled={loading}>
+            <Button 
+              variant="outline" 
+              onClick={onClose} 
+              disabled={createMutation.isPending || updateMutation.isPending || deleteMutation.isPending}
+            >
               <X className="h-4 w-4 mr-2" />
               {isReadOnly ? 'Fechar' : 'Cancelar'}
             </Button>
             
             {!isReadOnly && (
-              <Button onClick={handleSave} disabled={loading}>
+              <Button 
+                onClick={handleSave} 
+                disabled={createMutation.isPending || updateMutation.isPending || loadingLinkedPatients || loadingLinkedTherapists}
+              >
                 <Save className="h-4 w-4 mr-2" />
-                {loading ? 'Salvando...' : 'Salvar'}
+                {(createMutation.isPending || updateMutation.isPending) ? 'Salvando...' : 'Salvar'}
               </Button>
             )}
           </div>

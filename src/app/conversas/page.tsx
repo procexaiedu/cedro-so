@@ -16,6 +16,7 @@ import {
   Loader2
 } from 'lucide-react'
 import { useState, useEffect } from 'react'
+import { fetchWithTimeout, NETWORK_CONFIG } from '@/lib/network-config'
 
 // Tipos para TypeScript
 interface Conversation {
@@ -52,6 +53,14 @@ interface MessagesResponse {
   }
 }
 
+interface MessageContent {
+  type: 'text' | 'image' | 'audio' | 'video' | 'document' | 'edited' | 'unknown'
+  content?: string
+  url?: string
+  mimetype?: string
+  originalContent?: string
+}
+
 export default function ConversasPage() {
   const [conversations, setConversations] = useState<Conversation[]>([])
   const [messages, setMessages] = useState<Message[]>([])
@@ -76,7 +85,9 @@ export default function ConversasPage() {
   const loadConversations = async () => {
     try {
       setLoading(true)
-      const response = await fetch('http://localhost:3001/api/conversations')
+      const response = await fetchWithTimeout('http://localhost:3001/api/conversations', {
+        timeout: NETWORK_CONFIG.DEFAULT_TIMEOUT
+      })
       if (!response.ok) throw new Error('Erro ao carregar conversas')
       
       const data = await response.json()
@@ -96,7 +107,9 @@ export default function ConversasPage() {
   const loadMessages = async (conversationId: string) => {
     try {
       setMessagesLoading(true)
-      const response = await fetch(`http://localhost:3001/api/conversations/${conversationId}/messages`)
+      const response = await fetchWithTimeout(`http://localhost:3001/api/conversations/${conversationId}/messages`, {
+        timeout: NETWORK_CONFIG.DEFAULT_TIMEOUT
+      })
       if (!response.ok) throw new Error('Erro ao carregar mensagens')
       
       const data: MessagesResponse = await response.json()
@@ -239,12 +252,13 @@ export default function ConversasPage() {
     if (!newMessage.trim() || !selectedConversation) return
     
     try {
-      const response = await fetch(`http://localhost:3001/api/conversations/${selectedConversation.id}/send-message`, {
+      const response = await fetchWithTimeout(`http://localhost:3001/api/conversations/${selectedConversation.id}/send-message`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ message: newMessage }),
+        timeout: NETWORK_CONFIG.DEFAULT_TIMEOUT
       })
       
       if (!response.ok) {
@@ -271,12 +285,13 @@ export default function ConversasPage() {
     if (!selectedConversation) return
     
     try {
-      const response = await fetch(`http://localhost:3001/api/conversations/${selectedConversation.id}/closer`, {
+      const response = await fetchWithTimeout(`http://localhost:3001/api/conversations/${selectedConversation.id}/closer`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ closer_active: true }),
+        timeout: NETWORK_CONFIG.DEFAULT_TIMEOUT
       })
       
       if (!response.ok) throw new Error('Erro ao ativar closer')

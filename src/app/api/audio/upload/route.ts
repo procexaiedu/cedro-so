@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase'
 import { uploadAudioFile } from '@/lib/minio'
+import { fetchWithTimeout, NETWORK_CONFIG } from '@/lib/network-config'
 
 export async function POST(request: NextRequest) {
   try {
@@ -100,14 +101,15 @@ export async function POST(request: NextRequest) {
 
     // Trigger audio processing pipeline
     try {
-      const processResponse = await fetch(`${request.nextUrl.origin}/api/audio/process`, {
+      const processResponse = await fetchWithTimeout(`${request.nextUrl.origin}/api/audio/process`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
           recording_job_id: recordingJob.id
-        })
+        }),
+        timeout: NETWORK_CONFIG.DEFAULT_TIMEOUT
       })
 
       if (!processResponse.ok) {

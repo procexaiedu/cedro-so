@@ -5,6 +5,8 @@ import { User, Session } from '@supabase/supabase-js'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { CedroUser, mapAuthUserToCedroUser } from '@/lib/auth'
+import { useAuthInterceptor } from '@/hooks/use-auth-interceptor'
+import { useRealtimeAppointments } from '@/hooks/use-realtime-appointments'
 
 type SupabaseContextType = {
   user: User | null
@@ -22,6 +24,12 @@ export function SupabaseProvider({ children }: { children: React.ReactNode }) {
   const [cedroUser, setCedroUser] = useState<CedroUser | null>(null)
   const [loading, setLoading] = useState(true)
   const router = useRouter()
+
+  // Ativar interceptador de autenticação
+  const { handleAuthError } = useAuthInterceptor()
+  
+  // Ativar atualizações em tempo real para appointments
+  useRealtimeAppointments()
 
   // Function to handle JWT expiration
   const handleJWTExpired = async () => {
