@@ -4,8 +4,7 @@ import { getPresignedUrl } from '@/lib/minio'
 
 export async function GET(request: NextRequest) {
   try {
-    const { searchParams } = new URL(request.url)
-    const recordingJobId = searchParams.get('recordingJobId')
+    const recordingJobId = request.nextUrl.searchParams.get('recordingJobId')
     
     if (!recordingJobId) {
       return NextResponse.json(

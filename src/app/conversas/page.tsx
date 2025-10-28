@@ -277,7 +277,7 @@ export default function ConversasPage() {
       
     } catch (error) {
       console.error('❌ Erro ao enviar mensagem:', error)
-      alert(`Erro ao enviar mensagem: ${error.message}`)
+      alert(`Erro ao enviar mensagem: ${error instanceof Error ? error.message : 'Erro desconhecido'}`)
     }
   }
 

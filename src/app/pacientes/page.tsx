@@ -39,7 +39,7 @@ import { useDebounce } from '@/hooks/use-debounce'
 
 const limit = 10
 
-export default function PacientesPage() {
+function PacientesPageContent() {
   const { cedroUser } = useSupabase()
   const searchParams = useSearchParams()
   
@@ -200,6 +200,8 @@ export default function PacientesPage() {
       </TableCell>
      </TableRow>
    ))
+   
+   PatientRow.displayName = 'PatientRow'
 
   const handleNewPatient = () => {
     setEditingPatientId(null)
@@ -528,5 +530,13 @@ export default function PacientesPage() {
         />
       </Suspense>
     </AppShell>
+  )
+}
+
+export default function PacientesPage() {
+  return (
+    <Suspense fallback={<PatientListSkeleton />}>
+      <PacientesPageContent />
+    </Suspense>
   )
 }

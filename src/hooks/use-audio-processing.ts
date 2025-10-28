@@ -41,8 +41,8 @@ export function useAudioProcessing(recordingJobId: string | null) {
   const [error, setError] = useState<string | null>(null)
   const [pollingAttempts, setPollingAttempts] = useState(0)
 
-  const fetchStatus = useCallback(async () => {
-    if (!recordingJobId) return
+  const fetchStatus = useCallback(async (): Promise<AudioProcessingStatus | null> => {
+    if (!recordingJobId) return null
 
     try {
       setLoading(true)
@@ -58,11 +58,13 @@ export function useAudioProcessing(recordingJobId: string | null) {
 
       const data = await response.json()
       setStatus(data)
+      return data
     } catch (err) {
       console.error('Error fetching audio processing status:', err)
       
       const errorMessage = err instanceof Error ? err.message : 'Unknown error'
       setError(errorMessage)
+      return null
     } finally {
       setLoading(false)
     }
