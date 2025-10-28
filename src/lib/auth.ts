@@ -25,14 +25,50 @@ export async function mapAuthUserToCedroUser(authUser: User): Promise<CedroUser 
       return null
     }
     
+    // Test connectivity first
+    console.log('🔌 Testing database connectivity...')
+    try {
+      const { data: testData, error: testError } = await supabase
+        .schema('cedro')
+        .from('users')
+        .select('count')
+        .limit(1)
+      
+      if (testError) {
+        console.error('❌ Database connectivity test failed:', testError)
+        return null
+      }
+      console.log('✅ Database connectivity test passed')
+    } catch (connectError) {
+      console.error('❌ Database connectivity error:', connectError)
+      return null
+    }
+
     // First, try to find existing user by email
     console.log('📡 Querying cedro.users for email:', authUser.email)
-    const { data: existingUser, error: fetchError } = await supabase
+    
+    // Add timeout to prevent hanging
+    const queryPromise = supabase
       .schema('cedro')
       .from('users')
       .select('*')
       .eq('email', authUser.email)
       .single()
+
+    const timeoutPromise = new Promise((_, reject) => 
+      setTimeout(() => reject(new Error('Query timeout after 10 seconds')), 10000)
+    )
+
+    let existingUser, fetchError
+    try {
+      const result = await Promise.race([queryPromise, timeoutPromise])
+      existingUser = result.data
+      fetchError = result.error
+      console.log('📊 Query completed successfully')
+    } catch (timeoutError) {
+      console.error('⏰ Query timeout or error:', timeoutError)
+      return null
+    }
 
     console.log('📊 Existing user query result:', { 
       existingUser: existingUser ? { id: existingUser.id, email: existingUser.email, role: existingUser.role } : null, 
@@ -61,12 +97,28 @@ export async function mapAuthUserToCedroUser(authUser: User): Promise<CedroUser 
 
     console.log('🆕 Creating new user:', newUser)
 
-    const { data: createdUser, error: createError } = await supabase
+    // Add timeout to creation query
+    const createPromise = supabase
       .schema('cedro')
       .from('users')
       .insert(newUser)
       .select()
       .single()
+
+    const createTimeoutPromise = new Promise((_, reject) => 
+      setTimeout(() => reject(new Error('User creation timeout after 10 seconds')), 10000)
+    )
+
+    let createdUser, createError
+    try {
+      const result = await Promise.race([createPromise, createTimeoutPromise])
+      createdUser = result.data
+      createError = result.error
+      console.log('📊 User creation query completed')
+    } catch (timeoutError) {
+      console.error('⏰ User creation timeout or error:', timeoutError)
+      return null
+    }
 
     console.log('📝 User creation result:', { 
       createdUser: createdUser ? { id: createdUser.id, email: createdUser.email, role: createdUser.role } : null, 
