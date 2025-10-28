@@ -42,20 +42,55 @@ export function SupabaseProvider({ children }: { children: React.ReactNode }) {
   }
 
   useEffect(() => {
+    let isMounted = true
+
     // Get initial session
     const getInitialSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession()
-      setSession(session)
-      setUser(session?.user ?? null)
-      
-      if (session?.user) {
-        const mappedUser = await mapAuthUserToCedroUser(session.user)
-        setCedroUser(mappedUser)
-      } else {
-        setCedroUser(null)
+      try {
+        const { data: { session }, error } = await supabase.auth.getSession()
+        
+        if (!isMounted) return
+        
+        if (error) {
+          console.error('Error getting session:', error)
+          setSession(null)
+          setUser(null)
+          setCedroUser(null)
+          setLoading(false)
+          return
+        }
+
+        setSession(session)
+        setUser(session?.user ?? null)
+        
+        if (session?.user) {
+          try {
+            const mappedUser = await mapAuthUserToCedroUser(session.user)
+            if (isMounted) {
+              setCedroUser(mappedUser)
+            }
+          } catch (error) {
+            console.error('Error mapping user:', error)
+            if (isMounted) {
+              setCedroUser(null)
+            }
+          }
+        } else {
+          setCedroUser(null)
+        }
+        
+        if (isMounted) {
+          setLoading(false)
+        }
+      } catch (error) {
+        console.error('Error in getInitialSession:', error)
+        if (isMounted) {
+          setSession(null)
+          setUser(null)
+          setCedroUser(null)
+          setLoading(false)
+        }
       }
-      
-      setLoading(false)
     }
 
     getInitialSession()
@@ -63,21 +98,39 @@ export function SupabaseProvider({ children }: { children: React.ReactNode }) {
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
+        if (!isMounted) return
+
+        console.log('Auth state change:', event, session?.user?.id)
+        
         setSession(session)
         setUser(session?.user ?? null)
         
         if (session?.user) {
-          const mappedUser = await mapAuthUserToCedroUser(session.user)
-          setCedroUser(mappedUser)
+          try {
+            const mappedUser = await mapAuthUserToCedroUser(session.user)
+            if (isMounted) {
+              setCedroUser(mappedUser)
+            }
+          } catch (error) {
+            console.error('Error mapping user on auth change:', error)
+            if (isMounted) {
+              setCedroUser(null)
+            }
+          }
         } else {
           setCedroUser(null)
         }
         
-        setLoading(false)
+        if (isMounted) {
+          setLoading(false)
+        }
       }
     )
 
-    return () => subscription.unsubscribe()
+    return () => {
+      isMounted = false
+      subscription.unsubscribe()
+    }
   }, [])
 
   const signOut = async () => {
