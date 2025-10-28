@@ -59,7 +59,15 @@ export function SupabaseProvider({ children }: { children: React.ReactNode }) {
       console.log('🚀 Starting getInitialSession...')
       try {
         console.log('📡 Calling supabase.auth.getSession()...')
-        const { data: { session }, error } = await supabase.auth.getSession()
+        
+        // Add timeout to prevent infinite hanging
+        const timeoutPromise = new Promise((_, reject) => {
+          setTimeout(() => reject(new Error('getSession timeout after 10 seconds')), 10000)
+        })
+        
+        const sessionPromise = supabase.auth.getSession()
+        
+        const { data: { session }, error } = await Promise.race([sessionPromise, timeoutPromise]) as any
         console.log('📡 getSession result:', { session: !!session, error: !!error })
         
         if (!isMounted) {
@@ -104,7 +112,20 @@ export function SupabaseProvider({ children }: { children: React.ReactNode }) {
           setLoading(false)
         }
       } catch (error) {
-        console.error('Error in getInitialSession:', error)
+        console.error('❌ Error in getInitialSession:', error)
+        
+        // Emergency fallback - if Supabase is completely unresponsive
+        if (error.message?.includes('timeout')) {
+          console.log('⚠️ Supabase timeout detected - using emergency fallback')
+          
+          // Try to redirect to login as fallback
+          if (typeof window !== 'undefined') {
+            console.log('🔄 Emergency redirect to login')
+            window.location.href = '/login'
+            return
+          }
+        }
+        
         if (isMounted) {
           setSession(null)
           setUser(null)

@@ -7,11 +7,23 @@ export const supabase = createSupabaseClient(supabaseUrl, supabaseAnonKey, {
   auth: {
     persistSession: true,
     autoRefreshToken: true,
+    detectSessionInUrl: true,
+    flowType: 'pkce'
   },
   global: {
     headers: {
       'x-client-info': 'cedro-so@1.0.0',
     },
+    fetch: (url, options = {}) => {
+      console.log('🌐 Supabase fetch:', url)
+      return fetch(url, {
+        ...options,
+        signal: AbortSignal.timeout(10000), // 10 second timeout
+      }).catch(error => {
+        console.error('❌ Supabase fetch error:', error)
+        throw error
+      })
+    }
   },
   db: {
     schema: 'cedro',
