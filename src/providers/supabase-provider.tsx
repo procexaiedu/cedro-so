@@ -92,8 +92,14 @@ export function SupabaseProvider({ children }: { children: React.ReactNode }) {
           console.log('👤 User found, mapping to CedroUser...')
           try {
             const mappedUser = await mapAuthUserToCedroUser(session.user)
-            console.log('✅ User mapped successfully:', mappedUser?.id)
+            console.log('🔄 mapAuthUserToCedroUser result:', {
+              success: !!mappedUser,
+              userId: mappedUser?.id,
+              userEmail: mappedUser?.email,
+              userRole: mappedUser?.role
+            })
             if (isMounted) {
+              console.log('🔄 Setting cedroUser state:', mappedUser ? 'with user data' : 'to null')
               setCedroUser(mappedUser)
             }
           } catch (error) {
@@ -149,12 +155,20 @@ export function SupabaseProvider({ children }: { children: React.ReactNode }) {
         
         if (session?.user) {
           try {
+            console.log('🔄 Auth state change - mapping user to CedroUser...')
             const mappedUser = await mapAuthUserToCedroUser(session.user)
+            console.log('🔄 Auth state change - mapAuthUserToCedroUser result:', {
+              success: !!mappedUser,
+              userId: mappedUser?.id,
+              userEmail: mappedUser?.email,
+              userRole: mappedUser?.role
+            })
             if (isMounted) {
+              console.log('🔄 Auth state change - setting cedroUser state:', mappedUser ? 'with user data' : 'to null')
               setCedroUser(mappedUser)
             }
           } catch (error) {
-            console.error('Error mapping user on auth change:', error)
+            console.error('❌ Error mapping user on auth change:', error)
             if (isMounted) {
               setCedroUser(null)
             }

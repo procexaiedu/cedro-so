@@ -19,7 +19,14 @@ export async function mapAuthUserToCedroUser(authUser: User): Promise<CedroUser 
   try {
     console.log('🔍 Mapping auth user to cedro user:', { email: authUser.email, id: authUser.id })
     
+    // Validate input
+    if (!authUser.email) {
+      console.error('❌ Auth user has no email')
+      return null
+    }
+    
     // First, try to find existing user by email
+    console.log('📡 Querying cedro.users for email:', authUser.email)
     const { data: existingUser, error: fetchError } = await supabase
       .schema('cedro')
       .from('users')
@@ -27,16 +34,19 @@ export async function mapAuthUserToCedroUser(authUser: User): Promise<CedroUser 
       .eq('email', authUser.email)
       .single()
 
-    console.log('📊 Existing user query result:', { existingUser, fetchError })
+    console.log('📊 Existing user query result:', { 
+      existingUser: existingUser ? { id: existingUser.id, email: existingUser.email, role: existingUser.role } : null, 
+      fetchError: fetchError ? { code: fetchError.code, message: fetchError.message } : null 
+    })
 
     if (fetchError && fetchError.code !== 'PGRST116') {
       // PGRST116 is "not found" error, which is expected for new users
-      console.error('Error fetching user:', fetchError)
+      console.error('❌ Error fetching user:', fetchError)
       return null
     }
 
     if (existingUser) {
-      console.log('✅ Found existing user:', existingUser)
+      console.log('✅ Found existing user, returning:', { id: existingUser.id, email: existingUser.email, role: existingUser.role })
       return existingUser as CedroUser
     }
 
@@ -58,17 +68,25 @@ export async function mapAuthUserToCedroUser(authUser: User): Promise<CedroUser 
       .select()
       .single()
 
-    console.log('📝 User creation result:', { createdUser, createError })
+    console.log('📝 User creation result:', { 
+      createdUser: createdUser ? { id: createdUser.id, email: createdUser.email, role: createdUser.role } : null, 
+      createError: createError ? { code: createError.code, message: createError.message } : null 
+    })
 
     if (createError) {
-      console.error('Error creating user:', createError)
+      console.error('❌ Error creating user:', createError)
       return null
     }
 
-    console.log('✅ Successfully created user:', createdUser)
+    console.log('✅ Successfully created user, returning:', { id: createdUser.id, email: createdUser.email, role: createdUser.role })
     return createdUser as CedroUser
   } catch (error) {
-    console.error('Error in mapAuthUserToCedroUser:', error)
+    console.error('❌ CRITICAL ERROR in mapAuthUserToCedroUser:', error)
+    console.error('❌ Error details:', {
+      name: error instanceof Error ? error.name : 'Unknown',
+      message: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : 'No stack trace'
+    })
     return null
   }
 }
