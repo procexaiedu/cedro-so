@@ -82,7 +82,7 @@ export async function mapAuthUserToCedroUser(authUser: User): Promise<CedroUser 
 
     let existingUser, fetchError
     try {
-      const result = await Promise.race([queryPromise, timeoutPromise])
+      const result = await Promise.race([queryPromise, timeoutPromise]) as any
       existingUser = result.data
       fetchError = result.error
       console.log('📊 Query completed successfully')
@@ -132,7 +132,7 @@ export async function mapAuthUserToCedroUser(authUser: User): Promise<CedroUser 
 
     let createdUser, createError
     try {
-      const result = await Promise.race([createPromise, createTimeoutPromise])
+      const result = await Promise.race([createPromise, createTimeoutPromise]) as any
       createdUser = result.data
       createError = result.error
       console.log('📊 User creation query completed')
