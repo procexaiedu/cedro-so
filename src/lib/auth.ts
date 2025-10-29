@@ -17,22 +17,43 @@ export type CedroUser = {
  */
 export async function mapAuthUserToCedroUser(authUser: User): Promise<CedroUser | null> {
   try {
-    console.log('🔍 Mapping auth user to cedro user:', { email: authUser.email, id: authUser.id })
-    
-    // Validate input
+    console.log('🔍 Starting mapAuthUserToCedroUser for:', { 
+      id: authUser.id, 
+      email: authUser.email,
+      aud: authUser.aud,
+      role: authUser.role
+    })
+
+    // Log current session info
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+    console.log('🔐 Current session info:', {
+      hasSession: !!session,
+      sessionError: sessionError,
+      accessToken: session?.access_token ? 'present' : 'missing',
+      tokenExpiry: session?.expires_at ? new Date(session.expires_at * 1000).toISOString() : 'unknown'
+    })
+
     if (!authUser.email) {
-      console.error('❌ Auth user has no email')
+      console.error('❌ No email found in auth user')
       return null
     }
     
     // Test connectivity first
     console.log('🔌 Testing database connectivity...')
+    console.log('🔧 Supabase client config:', {
+      url: supabase.supabaseUrl,
+      key: supabase.supabaseKey ? 'present' : 'missing',
+      schema: 'cedro'
+    })
+    
     try {
       const { data: testData, error: testError } = await supabase
         .schema('cedro')
         .from('users')
         .select('count')
         .limit(1)
+      
+      console.log('🔌 Connectivity test raw result:', { testData, testError })
       
       if (testError) {
         console.error('❌ Database connectivity test failed:', testError)
