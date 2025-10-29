@@ -24,6 +24,13 @@ export async function mapAuthUserToCedroUser(authUser: User): Promise<CedroUser 
       role: authUser.role
     })
 
+    console.log('🔍 AuthUser object details:', authUser)
+    console.log('🔍 AuthUser email check:', { 
+      email: authUser.email, 
+      hasEmail: !!authUser.email,
+      emailType: typeof authUser.email 
+    })
+
     // Log current session info
     const { data: { session }, error: sessionError } = await supabase.auth.getSession()
     console.log('🔐 Current session info:', {
