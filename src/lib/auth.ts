@@ -41,8 +41,8 @@ export async function mapAuthUserToCedroUser(authUser: User): Promise<CedroUser 
     // Test connectivity first
     console.log('🔌 Testing database connectivity...')
     console.log('🔧 Supabase client config:', {
-      url: supabase.supabaseUrl,
-      key: supabase.supabaseKey ? 'present' : 'missing',
+      url: process.env.NEXT_PUBLIC_SUPABASE_URL ? 'configured' : 'missing',
+      key: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ? 'present' : 'missing',
       schema: 'cedro'
     })
     
