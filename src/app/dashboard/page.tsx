@@ -45,12 +45,15 @@ export default function DashboardPage() {
   const loadDashboardData = async () => {
     setLoading(true)
     try {
+      // Extrair therapist_id se o usuário for terapeuta
+      const therapistId = cedroUser?.role === 'therapist' ? cedroUser.id : undefined
+
       const [statsData, consultasData, alertsData] = await Promise.all([
-        getDashboardStats(),
-        getProximasConsultas(),
-        getDashboardAlerts()
+        getDashboardStats(therapistId),
+        getProximasConsultas(therapistId),
+        getDashboardAlerts(therapistId)
       ])
-      
+
       setStats(statsData)
       setProximasConsultas(consultasData)
       setAlerts(alertsData)
