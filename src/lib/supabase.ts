@@ -18,7 +18,7 @@ export const supabase = createSupabaseClient(supabaseUrl, supabaseAnonKey, {
       console.log('🌐 Supabase fetch:', url)
       return fetch(url, {
         ...options,
-        signal: AbortSignal.timeout(10000), // 10 second timeout
+        signal: AbortSignal.timeout(30000), // 30 second timeout (increased from 10s)
       }).catch(error => {
         console.error('❌ Supabase fetch error:', error)
         throw error
@@ -47,6 +47,15 @@ export function createClient() {
       headers: {
         'x-client-info': 'cedro-so@1.0.0',
       },
+      fetch: (url, options = {}) => {
+        return fetch(url, {
+          ...options,
+          signal: AbortSignal.timeout(30000), // 30 second timeout (increased from 10s)
+        }).catch(error => {
+          console.error('❌ Supabase fetch error:', error)
+          throw error
+        })
+      }
     },
     db: {
       schema: 'cedro',

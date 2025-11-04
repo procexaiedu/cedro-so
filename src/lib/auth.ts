@@ -44,47 +44,20 @@ export async function mapAuthUserToCedroUser(authUser: User): Promise<CedroUser 
       console.error('❌ No email found in auth user')
       return null
     }
-    
-    // Test connectivity first
-    console.log('🔌 Testing database connectivity...')
-    console.log('🔧 Supabase client config:', {
-      url: process.env.NEXT_PUBLIC_SUPABASE_URL ? 'configured' : 'missing',
-      key: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ? 'present' : 'missing',
-      schema: 'cedro'
-    })
-    
-    try {
-      const { data: testData, error: testError } = await supabase
-        .schema('cedro')
-        .from('users')
-        .select('count')
-        .limit(1)
-      
-      console.log('🔌 Connectivity test raw result:', { testData, testError })
-      
-      if (testError) {
-        console.error('❌ Database connectivity test failed:', testError)
-        return null
-      }
-      console.log('✅ Database connectivity test passed')
-    } catch (connectError) {
-      console.error('❌ Database connectivity error:', connectError)
-      return null
-    }
 
     // First, try to find existing user by email
     console.log('📡 Querying cedro.users for email:', authUser.email)
-    
-    // Add timeout to prevent hanging
+
+    // Query only necessary columns to improve performance
     const queryPromise = supabase
       .schema('cedro')
       .from('users')
-      .select('*')
+      .select('id, email, name, role, phone, created_at, updated_at')
       .eq('email', authUser.email)
       .single()
 
-    const timeoutPromise = new Promise((_, reject) => 
-      setTimeout(() => reject(new Error('Query timeout after 10 seconds')), 10000)
+    const timeoutPromise = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('Query timeout after 30 seconds')), 30000)
     )
 
     let existingUser, fetchError
@@ -130,11 +103,11 @@ export async function mapAuthUserToCedroUser(authUser: User): Promise<CedroUser 
       .schema('cedro')
       .from('users')
       .insert(newUser)
-      .select()
+      .select('id, email, name, role, phone, created_at, updated_at')
       .single()
 
-    const createTimeoutPromise = new Promise((_, reject) => 
-      setTimeout(() => reject(new Error('User creation timeout after 10 seconds')), 10000)
+    const createTimeoutPromise = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('User creation timeout after 30 seconds')), 30000)
     )
 
     let createdUser, createError

@@ -51,7 +51,7 @@ export function SupabaseProvider({ children }: { children: React.ReactNode }) {
 
   // Debug logging
   useEffect(() => {
-    console.log('🔍 SupabaseProvider render:', {
+    console.log('🔍 SupabaseProvider state:', {
       user: user?.id,
       session: !!session,
       cedroUser: cedroUser?.id,
@@ -59,7 +59,7 @@ export function SupabaseProvider({ children }: { children: React.ReactNode }) {
       isMapping,
       timestamp: new Date().toISOString()
     })
-  })
+  }, [user, session, cedroUser, loading, isMapping])
 
   // Ativar interceptador de autenticação
   const { handleAuthError } = useAuthInterceptor()
@@ -80,28 +80,29 @@ export function SupabaseProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     let isMounted = true
+    let authStateChangeTimeout: NodeJS.Timeout | null = null
 
     // Get initial session
     const getInitialSession = async () => {
       console.log('🚀 Starting getInitialSession...')
       try {
         console.log('📡 Calling supabase.auth.getSession()...')
-        
+
         // Add timeout to prevent infinite hanging
         const timeoutPromise = new Promise((_, reject) => {
-          setTimeout(() => reject(new Error('getSession timeout after 10 seconds')), 10000)
+          setTimeout(() => reject(new Error('getSession timeout after 30 seconds')), 30000)
         })
-        
+
         const sessionPromise = supabase.auth.getSession()
-        
+
         const { data: { session }, error } = await Promise.race([sessionPromise, timeoutPromise]) as any
         console.log('📡 getSession result:', { session: !!session, error: !!error })
-        
+
         if (!isMounted) {
           console.log('⚠️ Component unmounted, returning early')
           return
         }
-        
+
         if (error) {
           console.error('❌ Error getting session:', error)
           setSession(null)
@@ -114,7 +115,7 @@ export function SupabaseProvider({ children }: { children: React.ReactNode }) {
         console.log('✅ Setting session and user state...')
         setSession(session)
         setUser(session?.user ?? null)
-        
+
         if (session?.user) {
           console.log('👤 User found, mapping to CedroUser...')
           const mappedUser = await safeMapAuthUserToCedroUser(session.user)
@@ -132,18 +133,18 @@ export function SupabaseProvider({ children }: { children: React.ReactNode }) {
           console.log('👤 No user in session')
           setCedroUser(null)
         }
-        
+
         if (isMounted) {
           console.log('🏁 Setting loading to false')
           setLoading(false)
         }
       } catch (error) {
         console.error('❌ Error in getInitialSession:', error)
-        
+
         // Emergency fallback - if Supabase is completely unresponsive
         if (error instanceof Error && error.message?.includes('timeout')) {
           console.log('⚠️ Supabase timeout detected - using emergency fallback')
-          
+
           // Try to redirect to login as fallback
           if (typeof window !== 'undefined') {
             console.log('🔄 Emergency redirect to login')
@@ -151,7 +152,7 @@ export function SupabaseProvider({ children }: { children: React.ReactNode }) {
             return
           }
         }
-        
+
         if (isMounted) {
           setSession(null)
           setUser(null)
@@ -163,16 +164,21 @@ export function SupabaseProvider({ children }: { children: React.ReactNode }) {
 
     getInitialSession()
 
-    // Listen for auth changes
+    // Listen for auth changes with forced timeout fallback
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         if (!isMounted) return
 
-        console.log('Auth state change:', event, session?.user?.id)
-        
+        // Clear previous timeout
+        if (authStateChangeTimeout) {
+          clearTimeout(authStateChangeTimeout)
+        }
+
+        console.log('🔐 Auth state change event:', event, 'user:', session?.user?.id)
+
         setSession(session)
         setUser(session?.user ?? null)
-        
+
         if (session?.user) {
           console.log('🔄 Auth state change - mapping user to CedroUser...')
           const mappedUser = await safeMapAuthUserToCedroUser(session.user)
@@ -185,19 +191,31 @@ export function SupabaseProvider({ children }: { children: React.ReactNode }) {
           if (isMounted) {
             console.log('🔄 Auth state change - setting cedroUser state:', mappedUser ? 'with user data' : 'to null')
             setCedroUser(mappedUser)
+            setLoading(false)
           }
         } else {
+          console.log('👤 No user in auth state change')
           setCedroUser(null)
-        }
-        
-        if (isMounted) {
           setLoading(false)
+        }
+
+        // Force loading false after 35 seconds as absolute fallback
+        if (isMounted) {
+          authStateChangeTimeout = setTimeout(() => {
+            console.warn('⚠️ FORCED TIMEOUT: Setting loading to false after 35 seconds')
+            if (isMounted) {
+              setLoading(false)
+            }
+          }, 35000)
         }
       }
     )
 
     return () => {
       isMounted = false
+      if (authStateChangeTimeout) {
+        clearTimeout(authStateChangeTimeout)
+      }
       subscription.unsubscribe()
     }
   }, [])
