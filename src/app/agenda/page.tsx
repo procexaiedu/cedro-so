@@ -26,13 +26,13 @@ import {
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useSupabase } from '@/providers/supabase-provider'
-import { 
-  useAppointments, 
-  useTherapists, 
-  usePatientsForAppointments, 
+import {
+  useAppointments,
+  useTherapists,
+  usePatientsForAppointments,
   useServices,
-  type Appointment 
-} from '@/hooks/use-appointments'
+  type Appointment
+} from '@/hooks/use-appointments-adapter'
 import { useDebounce } from '@/hooks/use-debounce'
 import { AppointmentListSkeleton } from '@/components/skeletons/appointment-skeleton'
 import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, addDays, addWeeks, addMonths, subDays, subWeeks, subMonths, isSameDay, parseISO } from 'date-fns'

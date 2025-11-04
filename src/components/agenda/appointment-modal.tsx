@@ -14,14 +14,14 @@ import { CalendarIcon, Clock, User, Stethoscope, Trash2, Save, X } from 'lucide-
 import { format, parseISO, addMinutes } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { useToast } from '@/hooks/use-toast'
-import { 
+import {
   useCreateAppointment,
   useUpdateAppointment,
   useDeleteAppointment,
   useLinkedPatients,
   useLinkedTherapists,
-  type Appointment 
-} from '@/hooks/use-appointments'
+  type Appointment
+} from '@/hooks/use-appointments-adapter'
 import { useRefreshOnModalOpen } from '@/hooks/use-realtime-appointments'
 import { isPatientLinkedToTherapist } from '@/data/agenda'
 
