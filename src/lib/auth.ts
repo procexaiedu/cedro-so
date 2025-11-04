@@ -25,25 +25,18 @@ export async function mapAuthUserToCedroUser(authUser: User): Promise<CedroUser 
     })
 
     console.log('🔍 AuthUser object details:', authUser)
-    console.log('🔍 AuthUser email check:', { 
-      email: authUser.email, 
+    console.log('🔍 AuthUser email check:', {
+      email: authUser.email,
       hasEmail: !!authUser.email,
-      emailType: typeof authUser.email 
-    })
-
-    // Log current session info
-    const { data: { session }, error: sessionError } = await supabase.auth.getSession()
-    console.log('🔐 Current session info:', {
-      hasSession: !!session,
-      sessionError: sessionError,
-      accessToken: session?.access_token ? 'present' : 'missing',
-      tokenExpiry: session?.expires_at ? new Date(session.expires_at * 1000).toISOString() : 'unknown'
+      emailType: typeof authUser.email
     })
 
     if (!authUser.email) {
       console.error('❌ No email found in auth user')
       return null
     }
+
+    console.log('✅ Email validated, proceeding with user lookup...')
 
     // First, try to find existing user by email
     console.log('📡 Querying cedro.users for email:', authUser.email)
