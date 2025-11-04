@@ -164,6 +164,15 @@ export const queryKeys = {
     detail: (id: string) => [...queryKeys.carePlans.all, 'detail', id] as const
   },
 
+  // Recording Jobs
+  recordingJobs: {
+    all: ['recordingJobs'] as const,
+    list: () => [...queryKeys.recordingJobs.all, 'list'] as const,
+    byPatient: (patientId: string) => [...queryKeys.recordingJobs.all, 'byPatient', patientId] as const,
+    byStatus: (status: string) => [...queryKeys.recordingJobs.all, 'byStatus', status] as const,
+    detail: (id: string) => [...queryKeys.recordingJobs.all, 'detail', id] as const
+  },
+
   // Invoices
   invoices: {
     all: ['invoices'] as const,
