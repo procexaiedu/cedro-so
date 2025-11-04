@@ -6,7 +6,7 @@
 
 import { supabase } from '@/lib/supabase'
 import { api } from './client'
-import type { Appointment } from './appointments'
+import type { Appointment } from './types'
 
 export interface AppointmentWithDetails extends Appointment {
   patient_name?: string

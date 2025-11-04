@@ -41,10 +41,12 @@ type AppointmentModalProps = {
 
 const statusOptions = [
   { value: 'scheduled', label: 'Agendado', color: 'bg-blue-100 text-blue-800' },
+  { value: 'confirmed', label: 'Confirmado', color: 'bg-blue-100 text-blue-800' },
   { value: 'completed', label: 'Concluído', color: 'bg-green-100 text-green-800' },
   { value: 'cancelled', label: 'Cancelado', color: 'bg-red-100 text-red-800' },
-  { value: 'no_show', label: 'Faltou', color: 'bg-gray-100 text-gray-800' }
-]
+  { value: 'no_show', label: 'Faltou', color: 'bg-gray-100 text-gray-800' },
+  { value: 'rescheduled', label: 'Remarcado', color: 'bg-yellow-100 text-yellow-800' }
+] as const
 
 export function AppointmentModal({
   isOpen,
@@ -66,7 +68,7 @@ export function AppointmentModal({
     patient_id: '',
     therapist_id: '',
     service_id: '',
-    status: 'scheduled' as 'scheduled' | 'completed' | 'cancelled' | 'no_show',
+    status: 'scheduled' as 'scheduled' | 'confirmed' | 'completed' | 'cancelled' | 'no_show' | 'rescheduled',
     date: new Date(),
     start_time: '09:00',
     duration: 60,
@@ -151,8 +153,14 @@ export function AppointmentModal({
   // Filter patients based on selected therapist using React Query data
   useEffect(() => {
     if (formData.therapist_id && isCreating && linkedPatients) {
-      setFilteredPatients(linkedPatients)
-      
+      // Transform linkedPatients to match expected component type
+      const transformedPatients = linkedPatients.map(p => ({
+        id: p.id,
+        name: p.full_name,
+        email: p.email || ''
+      }))
+      setFilteredPatients(transformedPatients)
+
       // Clear patient selection if current patient is not linked to the new therapist
       if (formData.patient_id) {
         const isLinked = linkedPatients.some(p => p.id === formData.patient_id)
@@ -169,8 +177,14 @@ export function AppointmentModal({
   // Filter therapists based on selected patient using React Query data
   useEffect(() => {
     if (formData.patient_id && isCreating && linkedTherapists) {
-      setFilteredTherapists(linkedTherapists)
-      
+      // Transform linkedTherapists to match expected component type
+      const transformedTherapists = linkedTherapists.map(t => ({
+        id: t.id,
+        name: t.name,
+        email: t.email || ''
+      }))
+      setFilteredTherapists(transformedTherapists)
+
       // Clear therapist selection if current therapist is not linked to the new patient
       if (formData.therapist_id) {
         const isLinked = linkedTherapists.some(t => t.id === formData.therapist_id)
@@ -232,10 +246,15 @@ export function AppointmentModal({
     const appointmentData = {
       patient_id: formData.patient_id,
       therapist_id: formData.therapist_id,
-      service_id: formData.service_id || undefined,
+      service_id: formData.service_id || null,
+      care_plan_id: null,
+      status: formData.status,
       start_at: startDateTime.toISOString(),
       end_at: endDateTime.toISOString(),
-      notes: formData.notes || undefined
+      channel: null,
+      origin_message_id: null,
+      notes: formData.notes || null,
+      meet_link: null
     }
 
     if (isCreating) {

@@ -41,15 +41,19 @@ export const APPOINTMENTS_QUERY_KEYS = {
  * Hook to fetch appointments with all related data
  * Uses new clean architecture API but provides old interface for backward compatibility
  */
-export function useAppointments(startDate: Date, endDate: Date, therapistId?: string) {
-  return useQuery({
+export function useAppointments(
+  startDate: Date,
+  endDate: Date,
+  therapistId?: string
+) {
+  return useQuery<AppointmentWithDetails[], Error>({
     queryKey: APPOINTMENTS_QUERY_KEYS.list(startDate, endDate, therapistId),
     queryFn: () => getAppointmentsWithDetails(startDate, endDate, therapistId),
     staleTime: 1 * 60 * 1000, // 1 minute - new strategy
     gcTime: 5 * 60 * 1000, // 5 minutes
     refetchOnWindowFocus: false,
     refetchOnReconnect: true,
-    refetchOnMount: 'stale',
+    refetchOnMount: true,
     retry: (failureCount, error) => {
       // Don't retry 4xx errors
       if ((error as any).status >= 400 && (error as any).status < 500) {
@@ -64,7 +68,7 @@ export function useAppointments(startDate: Date, endDate: Date, therapistId?: st
  * Hook to fetch therapists
  */
 export function useTherapists() {
-  return useQuery({
+  return useQuery<Array<{ id: string; name: string; email?: string; role: string }>, Error>({
     queryKey: APPOINTMENTS_QUERY_KEYS.therapists(),
     queryFn: () => getTherapistsList(),
     staleTime: 15 * 60 * 1000, // 15 minutes
@@ -79,7 +83,7 @@ export function useTherapists() {
  * Hook to fetch patients for appointments
  */
 export function usePatientsForAppointments() {
-  return useQuery({
+  return useQuery<Array<{ id: string; full_name: string; email?: string; phone?: string }>, Error>({
     queryKey: APPOINTMENTS_QUERY_KEYS.patients(),
     queryFn: () => getPatientsList(),
     staleTime: 10 * 60 * 1000, // 10 minutes
@@ -93,7 +97,7 @@ export function usePatientsForAppointments() {
  * Hook to fetch services
  */
 export function useServices() {
-  return useQuery({
+  return useQuery<Array<{ id: string; name: string; description?: string; default_duration_min: number; base_price_cents: number; active: boolean }>, Error>({
     queryKey: APPOINTMENTS_QUERY_KEYS.services(),
     queryFn: () => getServicesList(),
     staleTime: 30 * 60 * 1000, // 30 minutes

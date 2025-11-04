@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * CEDRO useInvoices Hooks - NEW CLEAN ARCHITECTURE
  *

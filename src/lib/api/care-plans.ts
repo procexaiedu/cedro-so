@@ -182,9 +182,9 @@ export async function updateCarePlan(
 }
 
 /**
- * Use a session from care plan
+ * Consume a session from care plan
  */
-export async function useSessionFromCarePlan(planId: string): Promise<CarePlan> {
+export async function consumeSessionFromCarePlan(planId: string): Promise<CarePlan> {
   try {
     const plan = await getCarePlanById(planId)
 

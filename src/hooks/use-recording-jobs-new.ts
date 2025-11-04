@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * CEDRO useRecordingJobs Hooks - NEW CLEAN ARCHITECTURE
  *

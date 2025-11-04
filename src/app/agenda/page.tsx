@@ -83,19 +83,37 @@ export default function AgendaPage() {
   // React Query hooks
   const { startDate, endDate } = getDateRange()
   const therapistId = cedroUser?.role === 'therapist' ? cedroUser.id : undefined
-  
+
   console.log('🔍 AgendaPage - Date range:', { startDate, endDate, currentDate })
-  
-  const { data: appointments = [], isLoading: appointmentsLoading } = useAppointments(
+
+  const appointmentsQuery = useAppointments(
     new Date(startDate),
     new Date(endDate),
     therapistId
   )
-  
-  const { data: therapists = [] } = useTherapists()
-  const { data: patients = [] } = usePatientsForAppointments()
-  const { data: services = [] } = useServices()
-  
+  const appointments = (appointmentsQuery.data || []) as Appointment[]
+  const appointmentsLoading = appointmentsQuery.isLoading
+
+  const { data: therapistsData = [] } = useTherapists()
+  const { data: patientsData = [] } = usePatientsForAppointments()
+  const { data: servicesData = [] } = useServices()
+
+  // Transform data to match component prop types
+  const therapists = useMemo(() =>
+    therapistsData.map(t => ({ id: t.id, name: t.name, email: t.email || '' })),
+    [therapistsData]
+  )
+
+  const patients = useMemo(() =>
+    patientsData.map(p => ({ id: p.id, name: p.full_name, email: p.email || '' })),
+    [patientsData]
+  )
+
+  const services = useMemo(() =>
+    servicesData.map(s => ({ id: s.id, name: s.name, duration_minutes: s.default_duration_min })),
+    [servicesData]
+  )
+
   const loading = appointmentsLoading
 
   const handleNewAppointment = useCallback((date?: Date, time?: string) => {

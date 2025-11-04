@@ -70,7 +70,7 @@ async function executeQuery<T>(
   options: QueryOptions = {}
 ): Promise<T[]> {
   try {
-    let query = supabase.schema('cedro').from(tableName)
+    let query: any = supabase.schema('cedro').from(tableName)
 
     // Select columns
     const columns = options.columns || '*'
@@ -141,7 +141,7 @@ async function executeQuery<T>(
  */
 async function getById<T>(tableName: string, id: string, columns?: string): Promise<T | null> {
   try {
-    let query = supabase.schema('cedro').from(tableName)
+    let query: any = supabase.schema('cedro').from(tableName)
 
     if (columns) {
       query = query.select(columns)
@@ -174,7 +174,7 @@ async function count(
   filters?: { key: string; value: string; operator?: 'eq' | 'in' }[]
 ): Promise<number> {
   try {
-    let query = supabase.schema('cedro').from(tableName).select('*', { count: 'exact', head: true })
+    let query: any = supabase.schema('cedro').from(tableName).select('*', { count: 'exact', head: true })
 
     if (filters?.length) {
       for (const f of filters) {

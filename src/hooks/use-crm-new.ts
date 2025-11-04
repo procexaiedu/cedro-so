@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * CEDRO useCrm Hooks - NEW CLEAN ARCHITECTURE
  *

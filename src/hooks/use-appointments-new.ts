@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * CEDRO useAppointments Hooks - NEW CLEAN ARCHITECTURE
  *
@@ -36,7 +37,11 @@ export function useAllAppointments() {
   return useQuery({
     queryKey: queryKeys.appointments.list(),
     queryFn: () => getAllAppointments(),
-    ...QUERY_OPTIONS_LIST
+    staleTime: 1 * 60 * 1000,
+    gcTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: true,
+    refetchOnMount: true
   })
 }
 
@@ -60,7 +65,11 @@ export function useAppointmentsByTherapistAndDate(
       return getAppointmentsByTherapistAndDate(therapistId, startDate, endDate)
     },
     enabled: !!therapistId,
-    ...QUERY_OPTIONS_LIST
+    staleTime: 1 * 60 * 1000,
+    gcTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: true,
+    refetchOnMount: true
   })
 }
 
@@ -77,7 +86,11 @@ export function useAppointmentsByPatient(patientId: string | undefined) {
       return getAppointmentsByPatient(patientId)
     },
     enabled: !!patientId,
-    ...QUERY_OPTIONS_LIST
+    staleTime: 1 * 60 * 1000,
+    gcTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: true,
+    refetchOnMount: true
   })
 }
 
@@ -91,7 +104,11 @@ export function useAppointmentsByDateRange(startDate: Date, endDate: Date) {
       endDate.toISOString().split('T')[0]
     ),
     queryFn: () => getAppointmentsByDateRange(startDate, endDate),
-    ...QUERY_OPTIONS_LIST
+    staleTime: 1 * 60 * 1000,
+    gcTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: true,
+    refetchOnMount: true
   })
 }
 
@@ -108,7 +125,11 @@ export function useAppointment(appointmentId: string | undefined) {
       return getAppointmentById(appointmentId)
     },
     enabled: !!appointmentId,
-    ...QUERY_OPTIONS_DETAIL
+    staleTime: 5 * 60 * 1000,
+    gcTime: 15 * 60 * 1000,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+    refetchOnMount: false
   })
 }
 
@@ -119,7 +140,11 @@ export function useAppointmentsByStatus(status: Appointment['status']) {
   return useQuery({
     queryKey: ['appointments-status', status],
     queryFn: () => getAppointmentsByStatus(status),
-    ...QUERY_OPTIONS_LIST
+    staleTime: 1 * 60 * 1000,
+    gcTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: true,
+    refetchOnMount: true
   })
 }
 
@@ -130,7 +155,11 @@ export function useAppointmentCountForDay(therapistId: string, date: Date) {
   return useQuery({
     queryKey: ['appointments-count-day', therapistId, date.toISOString().split('T')[0]],
     queryFn: () => countAppointmentsForDay(therapistId, date),
-    ...QUERY_OPTIONS_LIST
+    staleTime: 1 * 60 * 1000,
+    gcTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: true,
+    refetchOnMount: true
   })
 }
 

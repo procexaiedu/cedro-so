@@ -14,16 +14,16 @@ import type { ApiError } from './types'
  * - Quick refetch on mount if stale
  * - Aggressive cache clearing
  */
-export const QUERY_OPTIONS_LIST: UseQueryOptions = {
+export const QUERY_OPTIONS_LIST: Partial<UseQueryOptions> = {
   staleTime: 1 * 60 * 1000, // 1 minute
   gcTime: 5 * 60 * 1000, // 5 minutes (garbage collection)
   refetchOnWindowFocus: false,
   refetchOnReconnect: true,
-  refetchOnMount: 'stale', // Refetch if stale on mount
+  refetchOnMount: true, // Refetch on mount
   retry: (failureCount, error) => {
-    const apiError = error as ApiError
+    const apiError = error as unknown as ApiError
     // Don't retry 4xx errors (client errors like 403, 404)
-    if (apiError.status >= 400 && apiError.status < 500) {
+    if (apiError?.status >= 400 && apiError?.status < 500) {
       return false
     }
     // Retry 5xx and network errors up to 2 times
@@ -37,15 +37,15 @@ export const QUERY_OPTIONS_LIST: UseQueryOptions = {
  * - Longer cache
  * - Less refetching
  */
-export const QUERY_OPTIONS_STATIC: UseQueryOptions = {
+export const QUERY_OPTIONS_STATIC: Partial<UseQueryOptions> = {
   staleTime: 15 * 60 * 1000, // 15 minutes
   gcTime: 30 * 60 * 1000, // 30 minutes
   refetchOnWindowFocus: false,
   refetchOnReconnect: false,
   refetchOnMount: false,
   retry: (failureCount, error) => {
-    const apiError = error as ApiError
-    if (apiError.status >= 400 && apiError.status < 500) {
+    const apiError = error as unknown as ApiError
+    if (apiError?.status >= 400 && apiError?.status < 500) {
       return false
     }
     return failureCount < 1
@@ -58,15 +58,15 @@ export const QUERY_OPTIONS_STATIC: UseQueryOptions = {
  * - Medium cache
  * - Refetch on demand
  */
-export const QUERY_OPTIONS_DETAIL: UseQueryOptions = {
+export const QUERY_OPTIONS_DETAIL: Partial<UseQueryOptions> = {
   staleTime: 5 * 60 * 1000, // 5 minutes
   gcTime: 15 * 60 * 1000, // 15 minutes
   refetchOnWindowFocus: false,
   refetchOnReconnect: true,
   refetchOnMount: false,
   retry: (failureCount, error) => {
-    const apiError = error as ApiError
-    if (apiError.status >= 400 && apiError.status < 500) {
+    const apiError = error as unknown as ApiError
+    if (apiError?.status >= 400 && apiError?.status < 500) {
       return false
     }
     return failureCount < 2

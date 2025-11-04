@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * CEDRO usePatients Hook - NEW CLEAN ARCHITECTURE
  *

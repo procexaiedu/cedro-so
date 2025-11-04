@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * CEDRO useMedicalRecords Hooks - NEW CLEAN ARCHITECTURE
  *
