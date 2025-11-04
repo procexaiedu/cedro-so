@@ -149,6 +149,14 @@ export const queryKeys = {
     detail: (id: string) => [...queryKeys.leads.all, 'detail', id] as const
   },
 
+  // CRM (new clean architecture)
+  crm: {
+    all: ['crm'] as const,
+    list: () => [...queryKeys.crm.all, 'list'] as const,
+    detail: (id: string) => [...queryKeys.crm.all, 'detail', id] as const,
+    byStage: (stage: string) => [...queryKeys.crm.all, 'byStage', stage] as const
+  },
+
   // Care Plans
   carePlans: {
     all: ['carePlans'] as const,
