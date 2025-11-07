@@ -1,0 +1,264 @@
+================================================================================
+CEDRO DOCUMENTATION - SUMMARY & QUICK START
+================================================================================
+
+Created: November 2025
+Location: .agent/ folder
+Purpose: Centralized documentation hub for all engineers
+
+================================================================================
+DOCUMENTATION FILES CREATED
+================================================================================
+
+📄 README.md
+   → START HERE: Central index for all documentation
+   → Navigation hub with quick links
+   → Recent updates overview
+   → Key technologies and contacts
+
+📄 01-project-architecture.md
+   → Complete system overview and architecture
+   → Tech stack breakdown
+   → Directory structure with file organization
+   → Key architectural patterns (React Query, Supabase, Audio Processing)
+   → Data flow diagrams
+   → Integration points with external services
+   → Database schema overview
+
+📄 02-database-schema.md
+   → Complete Supabase database schema reference
+   → All 30+ tables with fields and constraints
+   → Primary keys, foreign keys, relationships
+   → Status enums and valid values
+   → Query patterns and examples
+   → Performance considerations
+
+📄 03-design-system.md
+   → MotherDuck Design System implementation guide
+   → Color palette (Dark, Teal, Beige, Blue)
+   → Typography scales and usage
+   → Spacing system (8px-40px)
+   → Component styles (buttons, cards, forms, badges)
+   → Tailwind CSS classes for all styles
+   → Decorative elements (Cloud, Diamond, Cube icons)
+   → Accessibility guidelines
+
+📄 04-sop.md
+   → Standard Operating Procedures for development
+   → Step-by-step guides for:
+     * Adding a new feature (5 steps)
+     * Database migrations
+     * Creating React components
+     * Implementing data fetching
+     * Testing (unit, component, integration)
+   → Code review checklist
+   → Useful development commands
+
+📄 05-recent-updates.md
+   → November 2025 updates and improvements
+   → MotherDuck Design System implementation details
+   → Dashboard improvements breakdown
+   → Agenda feature current status
+   → n8n workflow integration
+   → Roadmap for future features
+   → Quality assurance process
+
+================================================================================
+RECENT IMPROVEMENTS (NOVEMBER 2025)
+================================================================================
+
+✅ MOTHERDUCK DESIGN SYSTEM APPLIED
+   - Color palette: Dark (#383838), Teal (#16AA98), Beige (#F4EFEA), Blue (#6FC2FF)
+   - Typography: Space Mono (headings), Inter (body)
+   - Spacing system: 8px-40px values
+   - All UI components updated with consistent styling
+   - Design system showcase at /design-system route
+
+✅ DASHBOARD IMPROVEMENTS
+   - KPI cards with visual metrics
+   - Advanced charts (Revenue, Therapist, CRM Funnel, Payments)
+   - Period selector for time filtering
+   - Widgets: Paused Patients, Overdue Invoices, Recent Leads
+   - Real-time data integration
+
+🚧 AGENDA FEATURE (IN DEVELOPMENT)
+   - Appointment modal component created
+   - Therapist schedule management
+   - Schedule exceptions (blocks/extra times)
+   - Status tracking (scheduled, confirmed, completed, cancelled, no_show, rescheduled)
+   - Planned: Calendar view, confirmations, video integration
+
+🔧 SUPABASE MCP INTEGRATION
+   - Using Supabase MCP for type generation
+   - Ensuring data consistency
+   - Validating migrations before deployment
+   - Monitoring database health
+
+================================================================================
+HOW TO USE THIS DOCUMENTATION
+================================================================================
+
+FIRST TIME HERE?
+1. Read README.md for overview
+2. Review 01-project-architecture.md for system design
+3. Check 03-design-system.md for UI standards
+
+ADDING A NEW FEATURE?
+1. Follow 04-sop.md step-by-step
+2. Reference 02-database-schema.md for table info
+3. Apply 03-design-system.md for UI consistency
+
+UNDERSTANDING DATABASE?
+1. Start with 01-project-architecture.md (overview)
+2. Deep dive into 02-database-schema.md (detailed reference)
+
+STYLING & DESIGN?
+1. Read 03-design-system.md completely
+2. Check /design-system route for live examples
+3. Reference Tailwind CSS classes in design doc
+
+RECENT CHANGES?
+1. See 05-recent-updates.md for latest work
+2. Understand MotherDuck system from 03-design-system.md
+3. Check SOP for implementation patterns
+
+================================================================================
+KEY TECHNOLOGIES
+================================================================================
+
+Frontend:  Next.js 14, React 18, TypeScript, Tailwind CSS, Radix UI
+Backend:   Supabase (PostgreSQL), Next.js API Routes
+Data:      TanStack Query (React Query), Zod validation
+Testing:   Vitest, React Testing Library
+Audio:     FFmpeg (server-side), Whisper API, Groq/OpenAI
+Storage:   MinIO (S3-compatible)
+Automation: n8n with agent workflows
+Payments:  Asaas payment gateway
+
+================================================================================
+DEVELOPMENT STANDARDS
+================================================================================
+
+✅ MUST DO:
+   - Use cedro schema in database queries (NOT public)
+   - Create pure API functions in src/lib/api/
+   - Wrap data with React Query hooks
+   - Use queryKeys factory from react-query-patterns.ts
+   - Apply MotherDuck design system to all UI
+   - Handle errors with proper toast notifications
+   - Write TypeScript with strict mode
+   - Test critical functions
+
+❌ MUST NOT DO:
+   - Hardcode schema names or values
+   - Query database directly from components
+   - Use inline styles (use Tailwind classes)
+   - Skip error handling
+   - Create components without design system compliance
+   - Commit to main without tests
+   - Use console.log in production code
+
+================================================================================
+QUICK REFERENCE
+================================================================================
+
+DATABASE QUERY TEMPLATE:
+  const { data } = await supabase
+    .schema('cedro')                    // Always use cedro schema
+    .from('table_name')
+    .select('*')
+    .eq('id', value);
+
+REACT QUERY HOOK TEMPLATE:
+  export function useFeature(id: string | undefined) {
+    return useQuery({
+      queryKey: queryKeys.features.detail(id),
+      queryFn: () => getFeatureById(id!),
+      enabled: !!id,
+      ...QUERY_OPTIONS_DETAIL
+    });
+  }
+
+MOTHERDUCK STYLING:
+  <div className="text-motherduck-dark bg-motherduck-beige border-2 border-motherduck-dark p-spacing-m">
+    <h1 className="font-mono text-heading-1 font-bold uppercase">Title</h1>
+    <p className="text-body-lg">Body text</p>
+  </div>
+
+BUTTON VARIANTS:
+  <Button variant="teal">Primary</Button>
+  <Button variant="outline">Secondary</Button>
+  <Button variant="ghost">Tertiary</Button>
+
+================================================================================
+GETTING HELP
+================================================================================
+
+Need to understand...
+  → System architecture? → Read 01-project-architecture.md
+  → Database tables? → Read 02-database-schema.md
+  → UI/Design standards? → Read 03-design-system.md
+  → How to add features? → Read 04-sop.md
+  → Recent changes? → Read 05-recent-updates.md
+
+Found an issue?
+  → Check existing documentation for context
+  → Review code examples in relevant doc
+  → Search /design-system route for UI patterns
+  → Check vitest tests for implementation patterns
+
+================================================================================
+NEXT STEPS (ROADMAP)
+================================================================================
+
+IMMEDIATE (1-2 weeks):
+  □ Complete agenda calendar view
+  □ Appointment confirmation workflow
+  □ Mobile responsive improvements
+  □ Medical records SOAP templates
+
+SHORT-TERM (1-2 months):
+  □ Patient portal (patient-facing web)
+  □ Video consultation integration
+  □ Automated report generation
+  □ Advanced analytics dashboards
+
+MEDIUM-TERM (2-4 months):
+  □ Mobile app (React Native)
+  □ Prescription management
+  □ Insurance integration
+  □ Document upload & management
+
+See 05-recent-updates.md for complete roadmap.
+
+================================================================================
+TIPS & BEST PRACTICES
+================================================================================
+
+1. Always read the relevant .agent docs before starting work
+2. Use the SOP as a checklist for new features
+3. Check design-system page (/design-system) for live component examples
+4. Reference database schema when querying data
+5. Keep architecture patterns consistent across codebase
+6. Write comments for complex logic
+7. Test your changes before committing
+8. Update docs if you change architecture patterns
+9. Use TypeScript strict mode - no `any` without comments
+10. Toast notifications for user feedback on all mutations
+
+================================================================================
+DOCUMENT METADATA
+================================================================================
+
+Created:  November 2025
+Status:   Active
+Location: .agent/ directory (5 files + this summary)
+Authors:  Development team with Claude Code
+Purpose:  Comprehensive system documentation for developers
+Audience: Engineers, designers, architects
+License:  Internal use only
+
+All files are markdown (.md) format except this summary (.txt).
+Last updated: November 2025
+
+================================================================================
