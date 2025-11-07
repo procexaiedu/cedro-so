@@ -395,7 +395,7 @@ export default function AgendaPage() {
                       className={`text-center p-3 rounded-lg cursor-pointer transition-colors ${
                         isToday
                           ? 'bg-motherduck-teal text-white'
-                          : isSameDay(day, selectedDate)
+                          : selectedDate ? isSameDay(day, selectedDate) : false
                             ? 'bg-motherduck-teal/20'
                             : 'bg-gray-50'
                       }`}
