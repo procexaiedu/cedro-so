@@ -1,5 +1,6 @@
 'use client'
 
+import { Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { useRouter } from 'next/navigation'
 import { AppShell } from '@/components/layout/app-shell'
@@ -26,7 +27,7 @@ import { LeadsTable } from '@/components/dashboard/tables/leads-table'
 import { PausedPatientsWidget } from '@/components/dashboard/paused-patients-widget'
 import { useDashboardMetrics } from '@/hooks/use-dashboard-expanded'
 
-export default function DashboardPage() {
+const DashboardContent = () => {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { cedroUser } = useSupabase()
@@ -235,5 +236,13 @@ export default function DashboardPage() {
         </div>
       </div>
     </AppShell>
+  )
+}
+
+export default function DashboardPage() {
+  return (
+    <Suspense fallback={<div className="p-6">Carregando dashboard...</div>}>
+      <DashboardContent />
+    </Suspense>
   )
 }

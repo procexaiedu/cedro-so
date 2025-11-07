@@ -11,6 +11,8 @@
 
 # next.js
 /.next/
+/.next-windows/
+build/.next-windows/
 /out/
 
 # production
