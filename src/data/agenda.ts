@@ -541,6 +541,40 @@ export async function getTherapistSchedulesByDay(therapistId: string): Promise<R
 }
 
 /**
+ * Update an existing schedule exception
+ */
+export async function updateScheduleException(
+  exceptionId: string,
+  updates: {
+    date?: string
+    kind?: 'block' | 'extra'
+    start_time?: string
+    end_time?: string
+    note?: string | null
+  }
+): Promise<ScheduleException | null> {
+  try {
+    const { data, error } = await supabase
+      .schema('cedro')
+      .from('therapist_schedule_exceptions')
+      .update(updates)
+      .eq('id', exceptionId)
+      .select()
+      .single()
+
+    if (error) {
+      console.error('Error updating schedule exception:', error)
+      throw error
+    }
+
+    return data
+  } catch (error) {
+    console.error('Error in updateScheduleException:', error)
+    return null
+  }
+}
+
+/**
  * Delete a schedule exception
  */
 export async function deleteScheduleException(exceptionId: string): Promise<boolean> {
