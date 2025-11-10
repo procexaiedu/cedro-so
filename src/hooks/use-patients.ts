@@ -1,14 +1,16 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { 
-  getPatients, 
-  getTherapistsForFilter, 
-  createPatient, 
-  updatePatient, 
+import {
+  getPatients,
+  getTherapistsForFilter,
+  createPatient,
+  updatePatient,
   deletePatient,
+  getPatientStats,
   type Patient,
   type PatientFilters,
   type PaginationParams,
-  type UpdatePatientData
+  type UpdatePatientData,
+  type PatientStats
 } from '@/data/pacientes'
 import { useToast } from '@/hooks/use-toast'
 
@@ -16,9 +18,10 @@ import { useToast } from '@/hooks/use-toast'
 export const PATIENTS_QUERY_KEYS = {
   all: ['patients'] as const,
   lists: () => [...PATIENTS_QUERY_KEYS.all, 'list'] as const,
-  list: (filters: PatientFilters, pagination: PaginationParams, therapistId?: string) => 
+  list: (filters: PatientFilters, pagination: PaginationParams, therapistId?: string) =>
     [...PATIENTS_QUERY_KEYS.lists(), { filters, pagination, therapistId }] as const,
   therapists: () => ['therapists', 'filter'] as const,
+  stats: (therapistId?: string) => ['patients', 'stats', therapistId] as const,
 }
 
 // Hook para buscar pacientes com cache
@@ -42,6 +45,16 @@ export function useTherapistsForFilter() {
     queryFn: getTherapistsForFilter,
     staleTime: 15 * 60 * 1000, // 15 minutos - dados menos voláteis
     gcTime: 30 * 60 * 1000, // 30 minutos
+  })
+}
+
+// Hook para buscar stats globais de pacientes
+export function usePatientStats(therapistId?: string) {
+  return useQuery({
+    queryKey: PATIENTS_QUERY_KEYS.stats(therapistId),
+    queryFn: () => getPatientStats(therapistId),
+    staleTime: 5 * 60 * 1000, // 5 minutos
+    gcTime: 10 * 60 * 1000, // 10 minutos
   })
 }
 

@@ -34,8 +34,11 @@ import { LazyPatientForm, LazyPatientDetailDrawer, LazyPatientDeleteDialog } fro
 import { PatientListSkeleton, PatientTableSkeleton } from '@/components/skeletons/patient-skeleton'
 import { VirtualList } from '@/components/ui/virtual-list'
 import { useSupabase } from '@/providers/supabase-provider'
-import { usePatients, useTherapistsForFilter } from '@/hooks/use-patients'
+import { usePatients, useTherapistsForFilter, usePatientStats } from '@/hooks/use-patients'
 import { useDebounce } from '@/hooks/use-debounce'
+import { useKeyboardShortcuts } from '@/hooks/use-keyboard-shortcuts'
+import { PatientQuickActions } from '@/components/patients/patient-quick-actions'
+import { formatRelativeTime } from '@/lib/date-utils'
 
 const limit = 10
 
@@ -67,10 +70,16 @@ function PacientesPageContent() {
     error: patientsError 
   } = usePatients(finalFilters, { page: currentPage, limit }, therapistId)
 
-  const { 
-    data: therapists = [], 
-    isLoading: loadingTherapists 
+  const {
+    data: therapists = [],
+    isLoading: loadingTherapists
   } = useTherapistsForFilter()
+
+  // Get global patient statistics
+  const {
+    data: patientStats,
+    isLoading: loadingStats
+  } = usePatientStats(therapistId)
 
   // Extract data from response
   const patients = patientsResponse?.data || []
@@ -98,6 +107,25 @@ function PacientesPageContent() {
       setFormOpen(true)
     }
   }, [searchParams])
+
+  // Keyboard shortcuts
+  useKeyboardShortcuts([
+    {
+      key: '/',
+      callback: () => {
+        // Focus search input - would need ref for this
+        const searchInput = document.querySelector('input[placeholder*="Buscar"]') as HTMLInputElement
+        searchInput?.focus()
+      },
+      description: 'Focar busca'
+    },
+    {
+      key: 'n',
+      ctrlKey: true,
+      callback: () => handleNewPatient(),
+      description: 'Novo paciente'
+    }
+  ])
 
   const handleFilterChange = (key: keyof PatientFilters, value: string) => {
     setFilters(prev => ({
@@ -167,9 +195,9 @@ function PacientesPageContent() {
         </Badge>
       </TableCell>
       <TableCell>{patient.current_therapist_name || 'Não atribuído'}</TableCell>
-      <TableCell>{formatDate(patient.last_appointment || null)}</TableCell>
-      <TableCell>{patient.total_appointments || 0}</TableCell>
-      <TableCell className="text-right">
+      <TableCell className="text-sm text-muted-foreground">{formatRelativeTime(patient.last_appointment)}</TableCell>
+      <TableCell className="text-center">{patient.total_appointments || 0}</TableCell>
+      <TableCell className="text-right space-x-2">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" className="h-8 w-8 p-0">
@@ -188,7 +216,7 @@ function PacientesPageContent() {
               Editar
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem 
+            <DropdownMenuItem
               className="text-destructive"
               onClick={() => handleDeletePatient(patient)}
             >
@@ -233,10 +261,6 @@ function PacientesPageContent() {
       .slice(0, 2)
   }
 
-  // Calculate stats
-  const activePatients = patients.filter(p => !p.is_on_hold).length
-  const totalAppointments = patients.reduce((sum, p) => sum + (p.total_appointments || 0), 0)
-
   return (
     <AppShell>
       <div className="space-y-spacing-m">
@@ -264,13 +288,13 @@ function PacientesPageContent() {
               <Users className="h-5 w-5 text-motherduck-blue" />
             </CardHeader>
             <CardContent>
-              {loading ? (
+              {loadingStats ? (
                 <Skeleton className="h-10 w-16" />
               ) : (
                 <>
-                  <div className="font-mono text-heading-3 font-bold text-motherduck-dark">{total}</div>
+                  <div className="font-mono text-heading-3 font-bold text-motherduck-dark">{patientStats?.totalPatients || 0}</div>
                   <p className="text-caption text-motherduck-dark/70 mt-spacing-xxs">
-                    {activePatients} ativos
+                    {patientStats?.activePatients || 0} ativos
                   </p>
                 </>
               )}
@@ -284,13 +308,13 @@ function PacientesPageContent() {
               <Users className="h-5 w-5 text-motherduck-teal" />
             </CardHeader>
             <CardContent>
-              {loading ? (
+              {loadingStats ? (
                 <Skeleton className="h-10 w-16" />
               ) : (
                 <>
-                  <div className="font-mono text-heading-3 font-bold text-motherduck-dark">{activePatients}</div>
+                  <div className="font-mono text-heading-3 font-bold text-motherduck-dark">{patientStats?.activePatients || 0}</div>
                   <p className="text-caption text-motherduck-dark/70 mt-spacing-xxs">
-                    {total > 0 ? ((activePatients / total) * 100).toFixed(1) : 0}% do total
+                    {patientStats && patientStats.totalPatients > 0 ? ((patientStats.activePatients / patientStats.totalPatients) * 100).toFixed(1) : 0}% do total
                   </p>
                 </>
               )}
@@ -304,13 +328,13 @@ function PacientesPageContent() {
               <Calendar className="h-5 w-5 text-motherduck-blue" />
             </CardHeader>
             <CardContent>
-              {loading ? (
+              {loadingStats ? (
                 <Skeleton className="h-10 w-16" />
               ) : (
                 <>
-                  <div className="font-mono text-heading-3 font-bold text-motherduck-dark">{totalAppointments}</div>
+                  <div className="font-mono text-heading-3 font-bold text-motherduck-dark">{patientStats?.totalAppointments || 0}</div>
                   <p className="text-caption text-motherduck-dark/70 mt-spacing-xxs">
-                    {patients.length > 0 ? (totalAppointments / patients.length).toFixed(1) : 0} por paciente
+                    {patientStats && patientStats.totalPatients > 0 ? (patientStats.totalAppointments / patientStats.totalPatients).toFixed(1) : 0} por paciente
                   </p>
                 </>
               )}
@@ -324,11 +348,11 @@ function PacientesPageContent() {
               <Users className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              {loading ? (
+              {loadingStats ? (
                 <Skeleton className="h-8 w-16" />
               ) : (
                 <>
-                  <div className="text-2xl font-bold">{therapists.length}</div>
+                  <div className="text-2xl font-bold">{patientStats?.activeTherapists || 0}</div>
                   <p className="text-xs text-muted-foreground">
                     Atendendo pacientes
                   </p>

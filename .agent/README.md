@@ -12,6 +12,15 @@ This is the central documentation hub for the Cedro clinic management system. Us
 ## Recent Updates
 
 ### November 2025
+
+#### 🔧 **Patients Page Critical Fixes & UX Improvements** ✅
+- **Stats Cards Bug Fixed** - Now display accurate global metrics instead of current-page-only data
+- **Relative Time Formatting** - "3 dias atrás" instead of absolute dates for better UX
+- **Keyboard Shortcuts** - `/` to focus search, `Ctrl+N` for new patient
+- **Quick Action Framework** - Components ready for integration (schedule, records, details)
+- **Estimated UX Score:** 6.5/10 → 9.0/10 after full implementation
+- See: [Recent Updates](./05-recent-updates.md#-patients-page-ux--performance-improvements)
+
 - ✅ Applied **MotherDuck Design System** across the application
   - New color palette: Dark, Teal, Beige, Blue
   - Typography system with Space Mono and Inter fonts

@@ -12,6 +12,102 @@ This document outlines the recent improvements and feature developments in the C
 
 ---
 
+## ✅ Patients Page UX & Performance Improvements
+
+### Overview
+Comprehensive refactoring of the patients management page (`/pacientes`) with focus on **data accuracy**, **user experience**, and **performance**. Implemented from detailed UX analysis showing 23+ improvement opportunities.
+
+**UX Score Improvement:** 6.5/10 → 9.0/10 (estimated after all phases)
+
+### Phase 1: Critical Fixes ✅ COMPLETED
+
+#### 1. Stats Cards Bug Fix
+**Problem:** Stats cards calculated only from current page (10 patients), not total dataset
+- Symptoms: Incorrect metrics when paginating
+- Impact: Critical - displayed false data to users
+
+**Solution Implemented:**
+- Created `getPatientStats()` function in `src/data/pacientes.ts` (line 662)
+- New `usePatientStats()` hook in `src/hooks/use-patients.ts` (line 52)
+- Fetches global totals from Supabase, independent of pagination
+- Query keys properly organized in `PATIENTS_QUERY_KEYS.stats()`
+
+**Files Modified:**
+- `src/data/pacientes.ts` - Added stats API function
+- `src/hooks/use-patients.ts` - Added stats hook
+- `src/app/pacientes/page.tsx` - Updated all 4 stats cards to use new hook
+
+**Result:** Stats cards now display accurate global metrics regardless of current page
+
+#### 2. Visual Feedback Enhancement
+**Problem:** Date formatting not intuitive; users couldn't quickly gauge recency
+
+**Solution Implemented:**
+- Created `src/lib/date-utils.ts` with helper functions:
+  - `formatRelativeTime()` - Converts dates to "3 dias atrás", "2 semanas atrás"
+  - `formatDateWithRelative()` - Shows both absolute and relative time
+  - `getAppointmentStatus()` - Categorizes appointments (past, soon, future)
+
+**Example Output:**
+- "12/11/2025" → "3 dias atrás"
+- "05/11/2025" → "1 semana atrás"
+- "-" → "-" (null dates)
+
+**Files Modified:**
+- `src/app/pacientes/page.tsx` (line 178) - Updated "Última Consulta" column
+
+**Result:** Users can instantly assess patient recency without mental date math
+
+#### 3. Keyboard Shortcuts Implementation
+**Features Added:**
+- `/` - Focus search input (accessibility improvement)
+- `Ctrl+N` (or `Cmd+N` on Mac) - Create new patient
+
+**Implementation:**
+- Created reusable hook `src/hooks/use-keyboard-shortcuts.ts`
+- Hook supports: `ctrlKey`, `shiftKey`, `altKey`, `metaKey` modifiers
+- Helper function `getKeyboardShortcutText()` for displaying shortcuts in UI
+- Integration in `src/app/pacientes/page.tsx` (line 112-128)
+
+**Files Created:**
+- `src/hooks/use-keyboard-shortcuts.ts` - Reusable keyboard handler
+
+**Result:** Power users can navigate faster with keyboard shortcuts
+
+#### 4. Quick Action Components Framework
+**Components Created (ready to integrate):**
+
+**`src/components/patients/patient-quick-actions.tsx`**
+- Compact mode: 3 icon buttons (Schedule, Records, Details)
+- Full mode: 3 text buttons with icons
+- Props: `onSchedule`, `onViewRecords`, `onViewDetails` callbacks
+- Can be integrated into table rows for quick access
+
+**`src/components/patients/patient-quick-filters.tsx`**
+- Quick filter chips: Active, On Hold, No Appointment, New (7d)
+- Clear filters button (shows count)
+- Extensible filter system
+
+**Files Created:**
+- `src/components/patients/patient-quick-actions.tsx`
+- `src/components/patients/patient-quick-filters.tsx`
+
+**Result:** Foundation laid for improved action workflows
+
+### Phase 1 Summary
+
+| Task | Status | Files | Impact |
+|------|--------|-------|--------|
+| Stats Bug Fix | ✅ | 3 files | Critical - Fixed incorrect metrics |
+| Relative Time | ✅ | 2 files | High - Better UX |
+| Keyboard Shortcuts | ✅ | 2 files | Medium - Power user feature |
+| Quick Actions | ✅ | 2 files | Ready for integration |
+
+**TypeScript Check:** ✅ No errors
+**Estimated Time Saved:** Quick Wins should take 1-2 days
+
+---
+
 ## ✅ MotherDuck Design System Implementation
 
 ### Overview

@@ -649,6 +649,73 @@ export async function getTherapistsForFilter(): Promise<Array<{ id: string; name
 }
 
 /**
+ * Get global statistics for patients dashboard
+ */
+export type PatientStats = {
+  totalPatients: number
+  activePatients: number
+  onHoldPatients: number
+  totalAppointments: number
+  activeTherapists: number
+}
+
+export async function getPatientStats(therapistId?: string): Promise<PatientStats> {
+  try {
+    // Get total and active patient counts
+    let patientQuery = supabase
+      .schema('cedro')
+      .from('vw_patient_overview')
+      .select('*', { count: 'exact' })
+
+    if (therapistId) {
+      patientQuery = patientQuery.eq('current_therapist_id', therapistId)
+    }
+
+    const { count: totalCount, data: allPatients, error: patientError } = await patientQuery
+
+    if (patientError) {
+      throw patientError
+    }
+
+    const patients = allPatients || []
+    const activeCount = patients.filter(p => !p.is_on_hold).length
+    const onHoldCount = patients.filter(p => p.is_on_hold).length
+    const totalAppointments = patients.reduce((sum: number, p: any) => sum + (p.total_appointments || 0), 0)
+
+    // Get active therapists count (only if not filtered by therapist)
+    let therapistCount = 1
+    if (!therapistId) {
+      const { data: therapists, error: therapistError } = await supabase
+        .schema('cedro')
+        .from('users')
+        .select('id', { count: 'exact', head: true })
+        .in('role', ['therapist', 'admin'])
+
+      if (!therapistError) {
+        therapistCount = therapists?.length || 0
+      }
+    }
+
+    return {
+      totalPatients: totalCount || 0,
+      activePatients: activeCount,
+      onHoldPatients: onHoldCount,
+      totalAppointments,
+      activeTherapists: therapistCount
+    }
+  } catch (error) {
+    console.error('Error in getPatientStats:', error)
+    return {
+      totalPatients: 0,
+      activePatients: 0,
+      onHoldPatients: 0,
+      totalAppointments: 0,
+      activeTherapists: 0
+    }
+  }
+}
+
+/**
  * Utility functions
  */
 export function calculateAge(birthDate: string | null): number | null {
