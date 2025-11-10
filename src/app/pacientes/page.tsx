@@ -37,12 +37,12 @@ import { useSupabase } from '@/providers/supabase-provider'
 import { usePatients, useTherapistsForFilter } from '@/hooks/use-patients'
 import { useDebounce } from '@/hooks/use-debounce'
 
-const limit = 10
+const limit = 50
 
 function PacientesPageContent() {
   const { cedroUser } = useSupabase()
   const searchParams = useSearchParams()
-  
+
   // Filter states
   const [filters, setFilters] = useState<PatientFilters>({})
   const [searchTerm, setSearchTerm] = useState('')
@@ -57,8 +57,9 @@ function PacientesPageContent() {
     search: debouncedSearchTerm || undefined
   }), [filters, debouncedSearchTerm])
 
-  // Determine therapist ID for filtering
-  const therapistId = cedroUser?.role === 'therapist' ? cedroUser.id : undefined
+  // Determine therapist ID for filtering - only filter if therapist explicitly selects themselves
+  // Admins and other roles should see all patients
+  const therapistId = undefined // Remove automatic filtering by therapist role
 
   // React Query hooks
   const { 
