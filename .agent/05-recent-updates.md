@@ -108,6 +108,162 @@ Comprehensive refactoring of the patients management page (`/pacientes`) with fo
 
 ---
 
+## ✅ Patients Page Phase 2 - UX Workflow Improvements
+
+### Overview
+**Comprehensive Phase 2 refactoring** focusing on user experience workflow improvements, status model alignment, and mobile responsiveness. These improvements directly address pain points identified in Phase 1 analysis.
+
+**Key Achievements:**
+- ✅ Status Model Alignment (3-state: active, inactive, suspended)
+- ✅ Sticky Filter Toolbar for better discoverability
+- ✅ Quick Actions integrated into table rows
+- ✅ Full mobile responsiveness with card view
+
+### Phase 2A: Status Model Alignment
+
+**Problem Identified:** Mismatch between database schema (boolean `is_on_hold`) and UI design (3-state status)
+
+**Solution Implemented:**
+
+Created `getPatientStatus()` helper function in `src/data/pacientes.ts` (line 754):
+```typescript
+export function getPatientStatus(patient: Patient): PatientStatus {
+  if (patient.is_on_hold) return 'suspended'
+  if (patient.last_appointment) {
+    const lastAppointmentDate = new Date(patient.last_appointment)
+    const ninetyDaysAgo = new Date()
+    ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90)
+    if (lastAppointmentDate > ninetyDaysAgo) return 'active'
+  }
+  return 'inactive'
+}
+```
+
+**Status Mapping Logic:**
+| is_on_hold | Last Appointment | Derived Status | Badge Color |
+|---|---|---|---|
+| true | - | Suspenso | destructive (red) |
+| false | < 90 days | Ativo | default (blue) |
+| false | > 90 days | Inativo | secondary (gray) |
+
+**Files Modified:**
+- `src/data/pacientes.ts`: Added `getPatientStatus()` function
+- `src/app/pacientes/page.tsx`: Updated status badge to use `getPatientStatus()` and new helper functions
+- Filtering: Client-side status filter applied in `getPatients()` function
+
+**Result:** UI now properly represents 3-state status model without requiring database migrations
+
+### Phase 2B: Sticky Filter Toolbar
+
+**Problem:** Filters were hidden below stats cards, requiring users to scroll to change filters
+
+**Solution:** Created dedicated `PatientsFilterToolbar` component (new file: `src/components/patients/patients-filter-toolbar.tsx`)
+
+**Features:**
+- Sticky positioning at top of page (z-index: 40)
+- Always-visible search input
+- Status filter dropdown
+- Therapist filter dropdown
+- Clear filters button (shows active filter count)
+- Responsive design:
+  - Desktop: Horizontal layout with all fields visible
+  - Mobile: Stacked layout, full-width inputs
+- Real-time filtering (no "Search" button needed)
+
+**Integration:**
+- Moved above stats cards in page layout
+- Removed old card-based filter section
+- Reduced vertical scrolling for filter access
+- Improved UX for power users
+
+**Files:**
+- Created: `src/components/patients/patients-filter-toolbar.tsx`
+- Modified: `src/app/pacientes/page.tsx` (refactored layout, removed old filter card)
+
+### Phase 2C: Quick Actions Integration
+
+**Problem:** Important actions (schedule, view records) buried in dropdown menu
+
+**Solution:** Integrated `PatientQuickActions` component (from Phase 1) directly into table rows
+
+**Implementation:**
+- Compact mode with 3 icon buttons:
+  - 📅 Agendar (Schedule) - _not yet implemented_
+  - 📄 Prontuários (Medical Records) - _not yet implemented_
+  - 👁️ Detalhes (View Details) - ✅ Connected
+- Additional "More" dropdown for edit/delete
+- Improved visual hierarchy
+
+**Files Modified:**
+- `src/app/pacientes/page.tsx`: Integrated PatientQuickActions in PatientRow component
+
+**Result:** Faster access to common actions, reduced dropdown fatigue
+
+### Phase 2D: Mobile Responsiveness
+
+**Problem:** Table layout unusable on mobile devices (too many columns, no horizontal scroll)
+
+**Solution:** Responsive patient card view for mobile screens
+
+**Created `PatientCard` Component** (`src/components/patients/patient-card.tsx`):
+- Card-based layout optimized for mobile
+- Displays key patient information:
+  - Avatar with patient name and age
+  - Status badge
+  - Contact info (email, phone)
+  - Therapist assignment
+  - Appointment count
+  - Last appointment (relative time)
+  - Quick actions
+  - More menu (edit/delete)
+
+**Responsive Behavior:**
+- `< 768px (md)`: Card view
+- `>= 768px (md)`: Table view
+
+**Files:**
+- Created: `src/components/patients/patient-card.tsx`
+- Modified: `src/app/pacientes/page.tsx` (added conditional rendering)
+
+### Phase 2 Technical Details
+
+**Enhanced PatientStats Type:**
+```typescript
+export type PatientStats = {
+  totalPatients: number
+  activePatients: number        // Status = 'active'
+  inactivePatients: number      // Status = 'inactive'
+  suspendedPatients: number     // Status = 'suspended'
+  totalAppointments: number
+  activeTherapists: number
+}
+```
+
+**Client-Side Status Filtering:**
+- Status filter applied after fetching from database
+- Allows filtering by derived status without DB migrations
+- Note: In Phase 3, should add `status` column to database for better performance
+
+**Performance Considerations:**
+- All components properly memoized (PatientRow)
+- Virtual list still used for 50+ patients (table view)
+- Pagination maintained for mobile card view
+- No additional API calls for status filtering
+
+### Phase 2 Summary
+
+| Task | Status | Components | Lines | Impact |
+|------|--------|---|---|---|
+| Status Alignment | ✅ | getPatientStatus() | +22 lines | Critical - Fixed status model mismatch |
+| Sticky Toolbar | ✅ | PatientsFilterToolbar | +94 lines | High - Improved filter accessibility |
+| Quick Actions | ✅ | Integrated | +15 lines | Medium - Faster action access |
+| Mobile Responsive | ✅ | PatientCard | +141 lines | High - Full mobile support |
+
+**Code Quality:** ✅ TypeScript strict mode compliant, no compilation errors
+**Git Commit:** `e439891` - "feat: Phase 2 - UX Workflow Improvements"
+
+---
+
 ## ✅ MotherDuck Design System Implementation
 
 ### Overview

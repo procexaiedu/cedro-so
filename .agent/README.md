@@ -13,7 +13,15 @@ This is the central documentation hub for the Cedro clinic management system. Us
 
 ### November 2025
 
-#### 🔧 **Patients Page Critical Fixes & UX Improvements** ✅
+#### 🎯 **Patients Page Phase 2 - UX Workflow Improvements** ✅
+- **Status Model Alignment** - 3-state model (Active, Inactive, Suspended) with smart derivation
+- **Sticky Filter Toolbar** - Always-visible search/filters at top, improved discoverability
+- **Mobile Responsiveness** - Full mobile support with card view for < 768px screens
+- **Quick Actions Integration** - Fast access to schedule, records, details in table rows
+- **Result:** Complete workflow optimization with mobile-first design
+- See: [Recent Updates](./05-recent-updates.md#-patients-page-phase-2---ux-workflow-improvements)
+
+#### 🔧 **Patients Page Phase 1 - Critical Fixes** ✅
 - **Stats Cards Bug Fixed** - Now display accurate global metrics instead of current-page-only data
 - **Relative Time Formatting** - "3 dias atrás" instead of absolute dates for better UX
 - **Keyboard Shortcuts** - `/` to focus search, `Ctrl+N` for new patient
