@@ -6,12 +6,10 @@ import { AppShell } from '@/components/layout/app-shell'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Input } from '@/components/ui/input'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Search, Plus, Users, Calendar, Phone, Mail, MoreHorizontal, Eye, Edit, Trash2, AlertCircle } from 'lucide-react'
+import { Plus, Users, Calendar, Phone, Mail, MoreHorizontal, Edit, Trash2 } from 'lucide-react'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -21,13 +19,14 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { toast } from 'sonner'
-import { 
-  Patient, 
-  PatientFilters, 
-  calculateAge, 
-  formatDate, 
-  getStatusBadgeVariant, 
-  getStatusText 
+import {
+  Patient,
+  PatientFilters,
+  calculateAge,
+  formatDate,
+  getStatusBadgeVariant,
+  getStatusText,
+  getPatientStatus
 } from '@/data/pacientes'
 import { Suspense } from 'react'
 import { LazyPatientForm, LazyPatientDetailDrawer, LazyPatientDeleteDialog } from '@/components/lazy'
@@ -38,6 +37,8 @@ import { usePatients, useTherapistsForFilter, usePatientStats } from '@/hooks/us
 import { useDebounce } from '@/hooks/use-debounce'
 import { useKeyboardShortcuts } from '@/hooks/use-keyboard-shortcuts'
 import { PatientQuickActions } from '@/components/patients/patient-quick-actions'
+import { PatientCard } from '@/components/patients/patient-card'
+import { PatientsFilterToolbar } from '@/components/patients/patients-filter-toolbar'
 import { formatRelativeTime } from '@/lib/date-utils'
 
 const limit = 10
@@ -141,6 +142,14 @@ function PacientesPageContent() {
     setCurrentPage(1)
   }
 
+  const handleClearFilters = () => {
+    setFilters({})
+    setSearchTerm('')
+    setCurrentPage(1)
+  }
+
+  const hasActiveFilters = Object.values(filters).some(v => v !== undefined) || searchTerm.length > 0
+
   const handleViewPatient = (patientId: string) => {
     setSelectedPatientId(patientId)
     setDetailDrawerOpen(true)
@@ -190,41 +199,57 @@ function PacientesPageContent() {
         {calculateAge(patient.birth_date) || '-'} {calculateAge(patient.birth_date) ? 'anos' : ''}
       </TableCell>
       <TableCell>
-        <Badge variant={patient.is_on_hold ? 'secondary' : 'default'}>
-          {patient.is_on_hold ? 'Em pausa' : 'Ativo'}
-        </Badge>
+        {(() => {
+          const status = getPatientStatus(patient)
+          return (
+            <Badge variant={getStatusBadgeVariant(status)}>
+              {getStatusText(status)}
+            </Badge>
+          )
+        })()}
       </TableCell>
       <TableCell>{patient.current_therapist_name || 'Não atribuído'}</TableCell>
       <TableCell className="text-sm text-muted-foreground">{formatRelativeTime(patient.last_appointment)}</TableCell>
       <TableCell className="text-center">{patient.total_appointments || 0}</TableCell>
-      <TableCell className="text-right space-x-2">
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" className="h-8 w-8 p-0">
-              <span className="sr-only">Abrir menu</span>
-              <MoreHorizontal className="h-4 w-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuLabel>Ações</DropdownMenuLabel>
-            <DropdownMenuItem onClick={() => handleViewPatient(patient.id)}>
-              <Eye className="mr-2 h-4 w-4" />
-              Ver detalhes
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => handleEditPatient(patient.id)}>
-              <Edit className="mr-2 h-4 w-4" />
-              Editar
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem
-              className="text-destructive"
-              onClick={() => handleDeletePatient(patient)}
-            >
-              <Trash2 className="mr-2 h-4 w-4" />
-              Excluir
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+      <TableCell className="text-right">
+        <div className="flex items-center justify-end gap-2">
+          <PatientQuickActions
+            patient={patient}
+            isCompact
+            onSchedule={() => {
+              // TODO: Open appointment modal for this patient
+              toast.info('Agendar: Funcionalidade em desenvolvimento')
+            }}
+            onViewRecords={() => {
+              // TODO: Open medical records view for this patient
+              toast.info('Prontuários: Funcionalidade em desenvolvimento')
+            }}
+            onViewDetails={() => handleViewPatient(patient.id)}
+          />
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" className="h-8 w-8 p-0">
+                <span className="sr-only">Abrir menu</span>
+                <MoreHorizontal className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuLabel>Mais ações</DropdownMenuLabel>
+              <DropdownMenuItem onClick={() => handleEditPatient(patient.id)}>
+                <Edit className="mr-2 h-4 w-4" />
+                Editar
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                className="text-destructive"
+                onClick={() => handleDeletePatient(patient)}
+              >
+                <Trash2 className="mr-2 h-4 w-4" />
+                Excluir
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </TableCell>
      </TableRow>
    ))
@@ -263,7 +288,19 @@ function PacientesPageContent() {
 
   return (
     <AppShell>
-      <div className="space-y-spacing-m">
+      {/* Sticky Filter Toolbar */}
+      <PatientsFilterToolbar
+        searchTerm={searchTerm}
+        onSearchChange={setSearchTerm}
+        onSearch={handleSearch}
+        filters={filters}
+        onFilterChange={handleFilterChange}
+        therapists={therapists}
+        hasActiveFilters={hasActiveFilters}
+        onClearFilters={handleClearFilters}
+      />
+
+      <div className="space-y-spacing-m p-spacing-m">
         {/* Header */}
         <div className="flex items-center justify-between border-b-standard border-motherduck-dark pb-spacing-xs">
           <div>
@@ -362,66 +399,6 @@ function PacientesPageContent() {
           </Card>
         </div>
 
-        {/* Filters */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Filtros</CardTitle>
-            <CardDescription>
-              Use os filtros abaixo para encontrar pacientes específicos
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="flex flex-col space-y-4 md:flex-row md:space-y-0 md:space-x-4">
-              <div className="flex-1">
-                <div className="relative">
-                  <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Buscar por nome, email ou telefone..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-                    className="pl-8"
-                  />
-                </div>
-              </div>
-              <Button variant="outline" onClick={handleSearch}>
-                <Search className="mr-2 h-4 w-4" />
-                Buscar
-              </Button>
-              <Select 
-                value={filters.status || 'todos'} 
-                onValueChange={(value) => handleFilterChange('status', value)}
-              >
-                <SelectTrigger className="w-[180px]">
-                  <SelectValue placeholder="Status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="todos">Todos os Status</SelectItem>
-                  <SelectItem value="active">Ativo</SelectItem>
-                  <SelectItem value="inactive">Inativo</SelectItem>
-                  <SelectItem value="suspended">Suspenso</SelectItem>
-                </SelectContent>
-              </Select>
-              <Select 
-                value={filters.therapistId || 'todos'} 
-                onValueChange={(value) => handleFilterChange('therapistId', value)}
-              >
-                <SelectTrigger className="w-[200px]">
-                  <SelectValue placeholder="Terapeuta" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="todos">Todos os Terapeutas</SelectItem>
-                  {therapists.map(therapist => (
-                    <SelectItem key={therapist.id} value={therapist.id}>
-                      {therapist.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </CardContent>
-        </Card>
-
         {/* Patients Table */}
         <Card>
           <CardHeader>
@@ -445,43 +422,64 @@ function PacientesPageContent() {
               </div>
             ) : (
               <>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Paciente</TableHead>
-                      <TableHead>Contato</TableHead>
-                      <TableHead>Idade</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Terapeuta</TableHead>
-                      <TableHead>Última Consulta</TableHead>
-                      <TableHead>Total Consultas</TableHead>
-                      <TableHead className="text-right">Ações</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {loading ? (
-                      <PatientTableSkeleton count={5} />
-                    ) : patients.length > 50 ? (
-                      // Use virtual list for large datasets
-                      <VirtualList
-                        items={patients}
-                        itemHeight={72}
-                        height={400}
-                        renderItem={(patient) => <PatientRow patient={patient} />}
+                {/* Desktop Table View */}
+                <div className="hidden md:block overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Paciente</TableHead>
+                        <TableHead>Contato</TableHead>
+                        <TableHead>Idade</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Terapeuta</TableHead>
+                        <TableHead>Última Consulta</TableHead>
+                        <TableHead>Total Consultas</TableHead>
+                        <TableHead className="text-right">Ações</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {loading ? (
+                        <PatientTableSkeleton count={5} />
+                      ) : patients.length > 50 ? (
+                        // Use virtual list for large datasets
+                        <VirtualList
+                          items={patients}
+                          itemHeight={72}
+                          height={400}
+                          renderItem={(patient) => <PatientRow patient={patient} />}
+                        />
+                      ) : (
+                        // Regular rendering for smaller datasets
+                        patients.map((patient) => (
+                          <PatientRow key={patient.id} patient={patient} />
+                        ))
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
+
+                {/* Mobile Card View */}
+                <div className="md:hidden space-y-spacing-m">
+                  {patients.length === 0 ? (
+                    <div className="text-center py-8">
+                      <p className="text-muted-foreground">Nenhum paciente encontrado</p>
+                    </div>
+                  ) : (
+                    patients.map((patient) => (
+                      <PatientCard
+                        key={patient.id}
+                        patient={patient}
+                        onViewDetails={handleViewPatient}
+                        onEdit={handleEditPatient}
+                        onDelete={handleDeletePatient}
                       />
-                    ) : (
-                      // Regular rendering for smaller datasets
-                      patients.map((patient) => (
-                        <PatientRow key={patient.id} patient={patient} />
-                      ))
-                    )}
-                  </TableBody>
-                </Table>
-                
+                    ))
+                  )}
+                </div>
+
                 {patients.length === 0 && (
-                  <div className="text-center py-8">
-                    <AlertCircle className="mx-auto h-12 w-12 text-muted-foreground" />
-                    <p className="text-muted-foreground mt-2">Nenhum paciente encontrado</p>
+                  <div className="hidden md:block text-center py-8">
+                    <p className="text-muted-foreground">Nenhum paciente encontrado</p>
                   </div>
                 )}
 

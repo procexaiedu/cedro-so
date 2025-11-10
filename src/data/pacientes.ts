@@ -272,6 +272,9 @@ export async function getPatients(
       query = query.eq('current_therapist_id', filters.therapistId)
     }
 
+    // NOTE: Status filter is applied client-side since it's derived from is_on_hold
+    // In Phase 3, we should add a status column to the database for better performance
+
     // Apply pagination
     const from = (pagination.page - 1) * pagination.limit
     const to = from + pagination.limit - 1
@@ -287,7 +290,7 @@ export async function getPatients(
       throw error
     }
 
-    const patients: Patient[] = (data || []).map((row: any) => ({
+    let patients: Patient[] = (data || []).map((row: any) => ({
       id: row.patient_id,
       full_name: row.full_name,
       email: row.email,
@@ -312,12 +315,20 @@ export async function getPatients(
       next_appointment: row.next_appointment
     }))
 
+    // Apply status filter client-side
+    if (filters.status) {
+      patients = patients.filter(patient => {
+        const patientStatus = getPatientStatus(patient)
+        return patientStatus === filters.status
+      })
+    }
+
     return {
       data: patients,
-      total: count || 0,
+      total: patients.length, // Return filtered count instead of database count
       page: pagination.page,
       limit: pagination.limit,
-      totalPages: Math.ceil((count || 0) / pagination.limit)
+      totalPages: Math.ceil(patients.length / pagination.limit)
     }
   } catch (error) {
     console.error('Error in getPatients:', error)
@@ -654,7 +665,8 @@ export async function getTherapistsForFilter(): Promise<Array<{ id: string; name
 export type PatientStats = {
   totalPatients: number
   activePatients: number
-  onHoldPatients: number
+  inactivePatients: number
+  suspendedPatients: number
   totalAppointments: number
   activeTherapists: number
 }
@@ -678,8 +690,41 @@ export async function getPatientStats(therapistId?: string): Promise<PatientStat
     }
 
     const patients = allPatients || []
-    const activeCount = patients.filter(p => !p.is_on_hold).length
-    const onHoldCount = patients.filter(p => p.is_on_hold).length
+
+    // Count patients by derived status
+    let activeCount = 0
+    let inactiveCount = 0
+    let suspendedCount = 0
+
+    patients.forEach((p: any) => {
+      const patient: Patient = {
+        id: p.patient_id || p.id,
+        full_name: p.full_name,
+        email: p.email,
+        phone: p.phone,
+        birth_date: p.birth_date,
+        gender: p.gender,
+        cpf: p.cpf,
+        is_christian: p.is_christian,
+        origin: p.origin,
+        marital_status: p.marital_status,
+        occupation: p.occupation,
+        notes: p.notes,
+        address_json: p.address_json || {},
+        tags_text: p.tags_text || [],
+        is_on_hold: p.is_on_hold || false,
+        created_at: p.created_at,
+        updated_at: p.updated_at,
+        last_appointment: p.last_appointment,
+        total_appointments: p.total_appointments || 0
+      }
+
+      const status = getPatientStatus(patient)
+      if (status === 'active') activeCount++
+      else if (status === 'inactive') inactiveCount++
+      else if (status === 'suspended') suspendedCount++
+    })
+
     const totalAppointments = patients.reduce((sum: number, p: any) => sum + (p.total_appointments || 0), 0)
 
     // Get active therapists count (only if not filtered by therapist)
@@ -699,7 +744,8 @@ export async function getPatientStats(therapistId?: string): Promise<PatientStat
     return {
       totalPatients: totalCount || 0,
       activePatients: activeCount,
-      onHoldPatients: onHoldCount,
+      inactivePatients: inactiveCount,
+      suspendedPatients: suspendedCount,
       totalAppointments,
       activeTherapists: therapistCount
     }
@@ -708,7 +754,8 @@ export async function getPatientStats(therapistId?: string): Promise<PatientStat
     return {
       totalPatients: 0,
       activePatients: 0,
-      onHoldPatients: 0,
+      inactivePatients: 0,
+      suspendedPatients: 0,
       totalAppointments: 0,
       activeTherapists: 0
     }
@@ -743,6 +790,31 @@ export function formatCurrency(amountCents: number): string {
     style: 'currency',
     currency: 'BRL'
   }).format(amountCents / 100)
+}
+
+/**
+ * Derive patient status from patient data
+ * - 'suspended': is_on_hold = true
+ * - 'active': is_on_hold = false and has appointment in last 90 days
+ * - 'inactive': is_on_hold = false and no recent appointments
+ */
+export function getPatientStatus(patient: Patient): PatientStatus {
+  if (patient.is_on_hold) {
+    return 'suspended'
+  }
+
+  // Check if patient has recent appointment (within 90 days)
+  if (patient.last_appointment) {
+    const lastAppointmentDate = new Date(patient.last_appointment)
+    const ninetyDaysAgo = new Date()
+    ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90)
+
+    if (lastAppointmentDate > ninetyDaysAgo) {
+      return 'active'
+    }
+  }
+
+  return 'inactive'
 }
 
 export function getStatusBadgeVariant(status: PatientStatus): 'default' | 'secondary' | 'destructive' {
