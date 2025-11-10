@@ -19,6 +19,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { toast } from 'sonner'
+import { getGenderDisplay } from '@/lib/utils'
 import {
   Patient,
   PatientFilters,
@@ -177,7 +178,7 @@ function PacientesPageContent() {
           </Avatar>
           <div>
             <div className="font-medium">{patient.full_name}</div>
-            <div className="text-sm text-muted-foreground">{patient.gender || 'Não informado'}</div>
+            <div className="text-sm text-muted-foreground">{getGenderDisplay(patient.gender)}</div>
           </div>
         </div>
       </TableCell>

@@ -306,10 +306,9 @@ export function PatientForm({ patientId, open, onOpenChange, onSuccess, cedroUse
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          <SelectItem value="masculino">Masculino</SelectItem>
-                          <SelectItem value="feminino">Feminino</SelectItem>
-                          <SelectItem value="nao-binario">Não-binário</SelectItem>
-                          <SelectItem value="prefiro-nao-informar">Prefiro não informar</SelectItem>
+                          <SelectItem value="M">Masculino</SelectItem>
+                          <SelectItem value="F">Feminino</SelectItem>
+                          <SelectItem value="O">Outro</SelectItem>
                         </SelectContent>
                       </Select>
                       <FormMessage />

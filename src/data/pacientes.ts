@@ -147,7 +147,7 @@ export type Patient = {
   email: string | null
   phone: string | null
   birth_date: string | null
-  gender: string | null
+  gender: 'M' | 'F' | 'O' | null
   cpf: string | null
   is_christian: boolean | null
   origin: string | null

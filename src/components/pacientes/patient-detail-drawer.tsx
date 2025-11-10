@@ -36,6 +36,7 @@ import {
   Trash2
 } from 'lucide-react'
 import { PatientOverview, getPatientOverview, calculateAge, formatDate, formatCurrency, getStatusBadgeVariant, getStatusText } from '@/data/pacientes'
+import { getGenderDisplay } from '@/lib/utils'
 
 interface PatientDetailDrawerProps {
   patientId: string | null
@@ -229,7 +230,7 @@ export function PatientDetailDrawer({
                     <User className="h-4 w-4 text-muted-foreground mt-1 flex-shrink-0" />
                     <div className="min-w-0 flex-1">
                       <p className="text-sm font-medium">Gênero</p>
-                      <p className="text-sm text-muted-foreground">{patient.gender || 'Não informado'}</p>
+                      <p className="text-sm text-muted-foreground">{getGenderDisplay(patient.gender)}</p>
                     </div>
                   </div>
                 </div>
