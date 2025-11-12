@@ -1,0 +1,227 @@
+import type { Config } from "tailwindcss"
+
+const config: Config = {
+  darkMode: ["class"],
+  content: [
+    './pages/**/*.{ts,tsx}',
+    './components/**/*.{ts,tsx}',
+    './app/**/*.{ts,tsx}',
+    './src/**/*.{ts,tsx}',
+  ],
+  prefix: "",
+  theme: {
+  	container: {
+  		center: true,
+  		padding: '2rem',
+  		screens: {
+  			'2xl': '1400px'
+  		}
+  	},
+  	extend: {
+  		colors: {
+  			motherduck: {
+  				dark: '#383838',
+  				teal: '#16AA98',
+  				beige: '#F4EFEA',
+  				blue: '#6fc2ff',
+  				yellow: '#FFD700',
+  				'white-bg': '#ffffff',
+  				'tech-blue': '#0D6EFD'
+  			},
+  			border: 'hsl(var(--border))',
+  			input: 'hsl(var(--input))',
+  			ring: 'hsl(var(--ring))',
+  			background: 'hsl(var(--background))',
+  			foreground: 'hsl(var(--foreground))',
+  			primary: {
+  				DEFAULT: 'hsl(var(--primary))',
+  				foreground: 'hsl(var(--primary-foreground))'
+  			},
+  			secondary: {
+  				DEFAULT: 'hsl(var(--secondary))',
+  				foreground: 'hsl(var(--secondary-foreground))'
+  			},
+  			destructive: {
+  				DEFAULT: 'hsl(var(--destructive))',
+  				foreground: 'hsl(var(--destructive-foreground))'
+  			},
+  			muted: {
+  				DEFAULT: 'hsl(var(--muted))',
+  				foreground: 'hsl(var(--muted-foreground))'
+  			},
+  			accent: {
+  				DEFAULT: 'hsl(var(--accent))',
+  				foreground: 'hsl(var(--accent-foreground))'
+  			},
+  			popover: {
+  				DEFAULT: 'hsl(var(--popover))',
+  				foreground: 'hsl(var(--popover-foreground))'
+  			},
+  			card: {
+  				DEFAULT: 'hsl(var(--card))',
+  				foreground: 'hsl(var(--card-foreground))'
+  			},
+  			sidebar: {
+  				DEFAULT: 'hsl(var(--sidebar-background))',
+  				foreground: 'hsl(var(--sidebar-foreground))',
+  				primary: 'hsl(var(--sidebar-primary))',
+  				'primary-foreground': 'hsl(var(--sidebar-primary-foreground))',
+  				accent: 'hsl(var(--sidebar-accent))',
+  				'accent-foreground': 'hsl(var(--sidebar-accent-foreground))',
+  				border: 'hsl(var(--sidebar-border))',
+  				ring: 'hsl(var(--sidebar-ring))'
+  			}
+  		},
+  		fontFamily: {
+  			mono: [
+  				'Space Mono',
+  				'Courier New',
+  				'monospace'
+  			],
+  			sans: [
+  				'Inter',
+  				'system-ui',
+  				'-apple-system',
+  				'sans-serif'
+  			]
+  		},
+  		fontSize: {
+  			'display-1': [
+  				'96px',
+  				{
+  					lineHeight: '1.05',
+  					letterSpacing: '-0.02em'
+  				}
+  			],
+  			'display-2': [
+  				'72px',
+  				{
+  					lineHeight: '1.05',
+  					letterSpacing: '-0.02em'
+  				}
+  			],
+  			'heading-1': [
+  				'56px',
+  				{
+  					lineHeight: '1.1',
+  					letterSpacing: '-0.01em'
+  				}
+  			],
+  			'heading-2': [
+  				'48px',
+  				{
+  					lineHeight: '1.15',
+  					letterSpacing: '-0.01em'
+  				}
+  			],
+  			'heading-3': [
+  				'40px',
+  				{
+  					lineHeight: '1.2',
+  					letterSpacing: '0'
+  				}
+  			],
+  			'heading-4': [
+  				'32px',
+  				{
+  					lineHeight: '1.25',
+  					letterSpacing: '0'
+  				}
+  			],
+  			'heading-5': [
+  				'24px',
+  				{
+  					lineHeight: '1.3',
+  					letterSpacing: '0'
+  				}
+  			],
+  			'heading-6': [
+  				'20px',
+  				{
+  					lineHeight: '1.4',
+  					letterSpacing: '0'
+  				}
+  			],
+  			'body-lg': [
+  				'18px',
+  				{
+  					lineHeight: '1.6',
+  					letterSpacing: '0'
+  				}
+  			],
+  			'body-md': [
+  				'16px',
+  				{
+  					lineHeight: '1.6',
+  					letterSpacing: '0'
+  				}
+  			],
+  			'body-sm': [
+  				'14px',
+  				{
+  					lineHeight: '1.5',
+  					letterSpacing: '0'
+  				}
+  			],
+  			'caption': [
+  				'12px',
+  				{
+  					lineHeight: '1.5',
+  					letterSpacing: '0.01em'
+  				}
+  			],
+  			'overline': [
+  				'11px',
+  				{
+  					lineHeight: '1.5',
+  					letterSpacing: '0.08em'
+  				}
+  			]
+  		},
+  		spacing: {
+  			'spacing-xxl': '180px',
+  			'spacing-xl': '110px',
+  			'spacing-l': '40px',
+  			'spacing-m': '32px',
+  			'spacing-s': '30px',
+  			'spacing-xs': '20px',
+  			'spacing-xxs': '8px'
+  		},
+  		borderRadius: {
+  			'minimal': '2px',
+  			'small': '4px',
+  			lg: 'var(--radius)',
+  			md: 'calc(var(--radius) - 2px)',
+  			sm: 'calc(var(--radius) - 4px)'
+  		},
+  		borderWidth: {
+  			'standard': '2px'
+  		},
+  		keyframes: {
+  			'accordion-down': {
+  				from: {
+  					height: '0'
+  				},
+  				to: {
+  					height: 'var(--radix-accordion-content-height)'
+  				}
+  			},
+  			'accordion-up': {
+  				from: {
+  					height: 'var(--radix-accordion-content-height)'
+  				},
+  				to: {
+  					height: '0'
+  				}
+  			}
+  		},
+  		animation: {
+  			'accordion-down': 'accordion-down 0.2s ease-out',
+  			'accordion-up': 'accordion-up 0.2s ease-out'
+  		}
+  	}
+  },
+  plugins: [require("tailwindcss-animate")],
+}
+
+export default config
