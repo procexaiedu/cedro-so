@@ -205,8 +205,8 @@ export function PatientForm({ patientId, open, onOpenChange, onSuccess, cedroUse
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
+      <DialogContent className="sm:max-w-[700px] max-h-[95vh] overflow-hidden flex flex-col gap-0">
+        <DialogHeader className="pb-4">
           <DialogTitle>
             {isEditing ? 'Editar Paciente' : 'Novo Paciente'}
           </DialogTitle>
@@ -219,14 +219,15 @@ export function PatientForm({ patientId, open, onOpenChange, onSuccess, cedroUse
         </DialogHeader>
 
         {loadingPatient ? (
-          <div className="flex items-center justify-center py-8">
+          <div className="flex items-center justify-center py-8 flex-1">
             <Loader2 className="h-6 w-6 animate-spin" />
             <span className="ml-2">Carregando dados do paciente...</span>
           </div>
         ) : (
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <>
+            <Form {...form}>
+              <form id="patient-form" onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 overflow-y-auto flex-1 px-2">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <FormField
                   control={form.control}
                   name="full_name"
@@ -436,23 +437,29 @@ export function PatientForm({ patientId, open, onOpenChange, onSuccess, cedroUse
                   )}
                 />
               </div>
-
-              <DialogFooter>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={handleClose}
-                  disabled={loading}
-                >
-                  Cancelar
-                </Button>
-                <Button type="submit" disabled={loading}>
-                  {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  {isEditing ? 'Atualizar' : 'Criar'} Paciente
-                </Button>
-              </DialogFooter>
             </form>
           </Form>
+
+            <DialogFooter className="pt-4 mt-4 border-t shrink-0">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleClose}
+                disabled={loading}
+              >
+                Cancelar
+              </Button>
+              <button 
+                type="submit" 
+                form="patient-form"
+                disabled={loading}
+                className="inline-flex items-center justify-center rounded-md bg-teal-600 px-4 py-2 text-sm font-medium text-white hover:bg-teal-700 disabled:pointer-events-none disabled:opacity-50"
+              >
+                {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                {isEditing ? 'Atualizar' : 'Criar'} Paciente
+              </button>
+            </DialogFooter>
+          </>
         )}
       </DialogContent>
     </Dialog>

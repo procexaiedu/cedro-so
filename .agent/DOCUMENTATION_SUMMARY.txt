@@ -1,5 +1,5 @@
 ================================================================================
-CEDRO DOCUMENTATION - SUMMARY & QUICK START
+CEDRO DOCUMENTATION - SUMMARY & QUICK STARTt
 ================================================================================
 
 Created: November 2025
