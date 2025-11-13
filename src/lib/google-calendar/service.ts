@@ -364,7 +364,12 @@ export class GoogleCalendarService {
 
       return watchData;
     } catch (error) {
-      console.error(`Error setting up watch on calendar ${calendarId}:`, error);
+      console.error(`Error setting up watch on calendar ${calendarId}:`, {
+        error,
+        message: error instanceof Error ? error.message : String(error),
+        code: (error as any)?.code,
+        status: (error as any)?.status,
+      });
       throw this.parseError(error);
     }
   }
@@ -482,19 +487,25 @@ export class GoogleCalendarService {
   /**
    * Parseia erros da Google API e lança de forma consistente
    */
-  private parseError(error: any): GoogleCalendarSyncError {
+  private parseError(error: any): Error {
     const code = error?.code || error?.status || 500;
     const message = this.extractErrorMessage(error);
+    const details = error?.errors;
 
-    const syncError: GoogleCalendarSyncError = {
+    const errorMessage = `Google Calendar API Error (${code}): ${message}${
+      details ? ' - ' + JSON.stringify(details) : ''
+    }`;
+
+    console.error('Google Calendar API Error:', {
       code,
       message,
-      details: error?.errors,
-    };
+      details,
+    });
 
-    console.error('Google Calendar API Error:', syncError);
-
-    return syncError;
+    const err = new Error(errorMessage);
+    (err as any).code = code;
+    (err as any).details = details;
+    return err;
   }
 }
 
