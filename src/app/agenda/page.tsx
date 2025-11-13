@@ -399,14 +399,78 @@ export default function AgendaPage() {
     const dayAppointments = getAppointmentsByDate(currentDate)
     const hours = Array.from({ length: 24 }, (_, i) => i)
 
-    // Group appointments by hour for positioning
+    // Helper: Calculate column layout for overlapping appointments
+    const calculateAppointmentLayout = (appointments: Appointment[]) => {
+      // Sort by start time
+      const sorted = [...appointments].sort((a, b) =>
+        new Date(a.start_at).getTime() - new Date(b.start_at).getTime()
+      )
+
+      const layout: Map<string, { column: number; totalColumns: number }> = new Map()
+
+      sorted.forEach((apt) => {
+        let column = 0
+        // Find first available column
+        while (true) {
+          let canUseColumn = true
+          // Check if this column conflicts with any already-placed appointment
+          for (const [otherId, otherLayout] of layout.entries()) {
+            if (otherLayout.column !== column) continue
+
+            const otherApt = sorted.find(a => a.id === otherId)
+            if (!otherApt) continue
+
+            const aptStart = new Date(apt.start_at).getTime()
+            const aptEnd = new Date(apt.end_at).getTime()
+            const otherStart = new Date(otherApt.start_at).getTime()
+            const otherEnd = new Date(otherApt.end_at).getTime()
+
+            // Check if they overlap
+            if (!(aptEnd <= otherStart || aptStart >= otherEnd)) {
+              canUseColumn = false
+              break
+            }
+          }
+          if (canUseColumn) break
+          column++
+        }
+
+        // Count total columns needed for this appointment
+        let maxColumn = column
+        for (const otherLayout of layout.values()) {
+          maxColumn = Math.max(maxColumn, otherLayout.column)
+        }
+
+        layout.set(apt.id, { column, totalColumns: maxColumn + 1 })
+      })
+
+      // Update total columns for all
+      const maxTotal = Math.max(...Array.from(layout.values()).map(l => l.totalColumns), 1)
+      for (const [id, layout2] of layout.entries()) {
+        layout.set(id, { ...layout2, totalColumns: maxTotal })
+      }
+
+      return layout
+    }
+
+    // Group appointments by hour and calculate layout per hour
     const appointmentsByHour: Record<number, Appointment[]> = {}
+    const appointmentLayout: Record<string, { column: number; totalColumns: number }> = {}
+
     dayAppointments.forEach((appointment) => {
       const hour = new Date(appointment.start_at).getHours()
       if (!appointmentsByHour[hour]) {
         appointmentsByHour[hour] = []
       }
       appointmentsByHour[hour].push(appointment)
+    })
+
+    // Calculate layout for each hour
+    Object.entries(appointmentsByHour).forEach(([hour, appointments]) => {
+      const layout = calculateAppointmentLayout(appointments)
+      layout.forEach((value, key) => {
+        appointmentLayout[key] = value
+      })
     })
 
     return (
@@ -487,7 +551,7 @@ export default function AgendaPage() {
                             handleNewAppointment(currentDate, `${String(hour).padStart(2, '0')}:00`)
                           }}
                         >
-                          {appointmentsByHour[hour]?.map((appointment, idx) => {
+                          {appointmentsByHour[hour]?.map((appointment) => {
                             const startHour = new Date(appointment.start_at).getHours()
                             const startMinutes = new Date(appointment.start_at).getMinutes()
                             const endHour = new Date(appointment.end_at).getHours()
@@ -500,17 +564,24 @@ export default function AgendaPage() {
                             const statusStyle = getStatusStyle(appointment.status)
                             const StatusIcon = statusStyle.icon
 
+                            // Get layout info for this appointment
+                            const layout = appointmentLayout[appointment.id] || { column: 0, totalColumns: 1 }
+                            const columnWidth = 100 / layout.totalColumns
+                            const leftPercent = (layout.column * columnWidth)
+
                             return (
                               <div
                                 key={appointment.id}
                                 draggable
-                                className={`absolute left-1 right-1 p-2 rounded border-l-4 text-xs overflow-hidden ${statusStyle.bg} ${statusStyle.border} hover:opacity-90 transition-all cursor-move shadow-sm hover:shadow-md ${
+                                className={`absolute p-2 rounded border-l-4 text-xs overflow-hidden ${statusStyle.bg} ${statusStyle.border} hover:opacity-90 transition-all cursor-move shadow-sm hover:shadow-md ${
                                   appointment.status === 'cancelled' ? 'opacity-60' : ''
                                 } ${draggedAppointment?.id === appointment.id ? 'opacity-50 ring-2 ring-offset-2' : ''}`}
                                 style={{
                                   top: `${topOffset}px`,
+                                  left: `${leftPercent}%`,
+                                  width: `calc(${columnWidth}% - 4px)`,
                                   minHeight: `${Math.max(height, 30)}px`,
-                                  zIndex: 10 + idx
+                                  zIndex: 10 + layout.column
                                 }}
                                 onDragStart={(e) => handleDragStart(e, appointment)}
                                 onDragEnd={handleDragEnd}
@@ -523,7 +594,7 @@ export default function AgendaPage() {
                                   <div className="font-bold text-xs">
                                     {format(parseISO(appointment.start_at), 'HH:mm')}
                                   </div>
-                                  <div className="flex items-center gap-0.5">
+                                  <div className="flex items-center gap-0.5 flex-shrink-0">
                                     <StatusIcon className="h-2.5 w-2.5 flex-shrink-0" />
                                     {appointment.origin === 'google' && (
                                       <span title="Google Calendar">📅</span>
@@ -564,6 +635,52 @@ export default function AgendaPage() {
     const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i))
     const hours = Array.from({ length: 24 }, (_, i) => i)
 
+    // Helper: Calculate column layout for overlapping appointments (same as day view)
+    const calculateAppointmentLayout = (appointments: Appointment[]) => {
+      const sorted = [...appointments].sort((a, b) =>
+        new Date(a.start_at).getTime() - new Date(b.start_at).getTime()
+      )
+
+      const layout: Map<string, { column: number; totalColumns: number }> = new Map()
+
+      sorted.forEach((apt) => {
+        let column = 0
+        while (true) {
+          let canUseColumn = true
+          for (const [otherId, otherLayout] of layout.entries()) {
+            if (otherLayout.column !== column) continue
+            const otherApt = sorted.find(a => a.id === otherId)
+            if (!otherApt) continue
+
+            const aptStart = new Date(apt.start_at).getTime()
+            const aptEnd = new Date(apt.end_at).getTime()
+            const otherStart = new Date(otherApt.start_at).getTime()
+            const otherEnd = new Date(otherApt.end_at).getTime()
+
+            if (!(aptEnd <= otherStart || aptStart >= otherEnd)) {
+              canUseColumn = false
+              break
+            }
+          }
+          if (canUseColumn) break
+          column++
+        }
+
+        let maxColumn = column
+        for (const otherLayout of layout.values()) {
+          maxColumn = Math.max(maxColumn, otherLayout.column)
+        }
+        layout.set(apt.id, { column, totalColumns: maxColumn + 1 })
+      })
+
+      const maxTotal = Math.max(...Array.from(layout.values()).map(l => l.totalColumns), 1)
+      for (const [id, layout2] of layout.entries()) {
+        layout.set(id, { ...layout2, totalColumns: maxTotal })
+      }
+
+      return layout
+    }
+
     return (
       <Card>
         <CardHeader>
@@ -592,12 +709,22 @@ export default function AgendaPage() {
 
                   // Group appointments by hour
                   const appointmentsByHour: Record<number, Appointment[]> = {}
+                  const appointmentLayout: Record<string, { column: number; totalColumns: number }> = {}
+
                   dayAppointments.forEach((appointment) => {
                     const hour = new Date(appointment.start_at).getHours()
                     if (!appointmentsByHour[hour]) {
                       appointmentsByHour[hour] = []
                     }
                     appointmentsByHour[hour].push(appointment)
+                  })
+
+                  // Calculate layout for each hour
+                  Object.entries(appointmentsByHour).forEach(([hour, appointments]) => {
+                    const layout = calculateAppointmentLayout(appointments)
+                    layout.forEach((value, key) => {
+                      appointmentLayout[key] = value
+                    })
                   })
 
                   return (
@@ -636,7 +763,7 @@ export default function AgendaPage() {
                               handleNewAppointment(day, `${String(hour).padStart(2, '0')}:00`)
                             }}
                           >
-                            {appointmentsByHour[hour]?.map((appointment, idx) => {
+                            {appointmentsByHour[hour]?.map((appointment) => {
                               const startHour = new Date(appointment.start_at).getHours()
                               const startMinutes = new Date(appointment.start_at).getMinutes()
                               const endHour = new Date(appointment.end_at).getHours()
@@ -649,17 +776,24 @@ export default function AgendaPage() {
                               const statusStyle = getStatusStyle(appointment.status)
                               const StatusIcon = statusStyle.icon
 
+                              // Get layout info for this appointment
+                              const layout = appointmentLayout[appointment.id] || { column: 0, totalColumns: 1 }
+                              const columnWidth = 100 / layout.totalColumns
+                              const leftPercent = (layout.column * columnWidth)
+
                               return (
                                 <div
                                   key={appointment.id}
                                   draggable
-                                  className={`absolute left-0.5 right-0.5 p-1 rounded border-l-4 text-xs overflow-hidden ${statusStyle.bg} ${statusStyle.border} hover:opacity-90 transition-all cursor-move shadow-sm hover:shadow-md ${
+                                  className={`absolute p-1 rounded border-l-4 text-xs overflow-hidden ${statusStyle.bg} ${statusStyle.border} hover:opacity-90 transition-all cursor-move shadow-sm hover:shadow-md ${
                                     appointment.status === 'cancelled' ? 'opacity-60' : ''
                                   } ${draggedAppointment?.id === appointment.id ? 'opacity-50 ring-2 ring-offset-1' : ''}`}
                                   style={{
                                     top: `${topOffset}px`,
+                                    left: `${leftPercent}%`,
+                                    width: `calc(${columnWidth}% - 2px)`,
                                     minHeight: `${Math.max(height, 24)}px`,
-                                    zIndex: 10 + idx
+                                    zIndex: 10 + layout.column
                                   }}
                                   onDragStart={(e) => handleDragStart(e, appointment)}
                                   onDragEnd={handleDragEnd}
@@ -672,7 +806,7 @@ export default function AgendaPage() {
                                     <div className="font-bold text-xs">
                                       {format(parseISO(appointment.start_at), 'HH:mm')}
                                     </div>
-                                    <div className="flex items-center gap-0.5">
+                                    <div className="flex items-center gap-0.5 flex-shrink-0">
                                       <StatusIcon className="h-2 w-2 flex-shrink-0" />
                                       {appointment.origin === 'google' && (
                                         <span title="Google Calendar">📅</span>
