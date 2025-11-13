@@ -47,7 +47,7 @@ export default function AgendaPage() {
   const { user, cedroUser } = useSupabase()
   const { toast } = useToast()
   const [viewMode, setViewMode] = useState<ViewMode>('week')
-  const [currentDate, setCurrentDate] = useState(new Date('2025-01-27'))
+  const [currentDate, setCurrentDate] = useState<Date>(new Date())
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date())
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedTherapist, setSelectedTherapist] = useState<string>('')
