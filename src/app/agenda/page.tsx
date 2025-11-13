@@ -137,9 +137,13 @@ export default function AgendaPage() {
   const getDateRange = () => {
     switch (viewMode) {
       case 'day':
+        // For day view, we need to include the entire day
+        // Start: 00:00:00 of current day
+        // End: 23:59:59 of current day (or 00:00:00 of next day)
+        const dayEnd = addDays(currentDate, 1)
         return {
           startDate: format(currentDate, 'yyyy-MM-dd'),
-          endDate: format(currentDate, 'yyyy-MM-dd')
+          endDate: format(dayEnd, 'yyyy-MM-dd')
         }
       case 'week':
         return {
