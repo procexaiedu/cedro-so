@@ -51,6 +51,7 @@ export default function AgendaPage() {
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date())
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedTherapist, setSelectedTherapist] = useState<string>('')
+  const [selectedPatient, setSelectedPatient] = useState<string>('')
   const [isNewAppointmentOpen, setIsNewAppointmentOpen] = useState(false)
   const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null)
   const [modalMode, setModalMode] = useState<'create' | 'edit' | 'view'>('create')
@@ -163,15 +164,16 @@ export default function AgendaPage() {
 
   const getFilteredAppointments = useMemo(() => {
     return appointments.filter(appointment => {
-      const matchesSearch = !debouncedSearchTerm || 
+      const matchesSearch = !debouncedSearchTerm ||
         appointment.patient_name?.toLowerCase().includes(debouncedSearchTerm.toLowerCase()) ||
         appointment.service_name?.toLowerCase().includes(debouncedSearchTerm.toLowerCase())
-      
+
       const matchesTherapist = !selectedTherapist || appointment.therapist_id === selectedTherapist
-      
-      return matchesSearch && matchesTherapist
+      const matchesPatient = !selectedPatient || appointment.patient_id === selectedPatient
+
+      return matchesSearch && matchesTherapist && matchesPatient
     })
-  }, [appointments, debouncedSearchTerm, selectedTherapist])
+  }, [appointments, debouncedSearchTerm, selectedTherapist, selectedPatient])
 
   const getAppointmentsByDate = useCallback((date: Date) => {
     const dateStr = format(date, 'yyyy-MM-dd')
@@ -442,8 +444,8 @@ export default function AgendaPage() {
               </div>
               {/* Filtro por terapeuta - apenas para administradores */}
               {cedroUser?.role === 'admin' && (
-                <Select 
-                  value={selectedTherapist || 'todos'} 
+                <Select
+                  value={selectedTherapist || 'todos'}
                   onValueChange={(value) => setSelectedTherapist(value === 'todos' ? '' : value)}
                 >
                   <SelectTrigger className="w-[200px]">
@@ -459,7 +461,28 @@ export default function AgendaPage() {
                   </SelectContent>
                 </Select>
               )}
-              <Button 
+
+              {/* Filtro por paciente - para admin e terapeutas */}
+              {(cedroUser?.role === 'admin' || cedroUser?.role === 'therapist') && (
+                <Select
+                  value={selectedPatient || 'todos'}
+                  onValueChange={(value) => setSelectedPatient(value === 'todos' ? '' : value)}
+                >
+                  <SelectTrigger className="w-[200px]">
+                    <SelectValue placeholder="Paciente" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="todos">Todos os Pacientes</SelectItem>
+                    {patients.map(patient => (
+                      <SelectItem key={patient.id} value={patient.id}>
+                        {patient.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+
+              <Button
                 variant="outline"
                 onClick={() => setCurrentDate(new Date())}
               >
