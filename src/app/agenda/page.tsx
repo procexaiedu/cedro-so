@@ -10,10 +10,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Separator } from '@/components/ui/separator'
-import { 
-  CalendarIcon, 
-  Plus, 
-  Clock, 
+import {
+  CalendarIcon,
+  Plus,
+  Clock,
   User,
   Filter,
   Search,
@@ -21,7 +21,11 @@ import {
   ChevronRight,
   Edit,
   Trash2,
-  MoreHorizontal
+  MoreHorizontal,
+  CheckCircle,
+  AlertCircle,
+  XCircle,
+  Pause
 } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -42,6 +46,68 @@ import { Suspense } from 'react'
 import { LazyAppointmentModal } from '@/components/lazy'
 
 type ViewMode = 'day' | 'week' | 'month'
+
+// Helper function to get status color and icon
+const getStatusStyle = (status: string) => {
+  switch (status) {
+    case 'scheduled':
+      return {
+        bg: 'bg-blue-100',
+        border: 'border-blue-500',
+        text: 'text-blue-900',
+        badge: 'bg-blue-100 text-blue-800',
+        icon: Clock
+      }
+    case 'confirmed':
+      return {
+        bg: 'bg-cyan-100',
+        border: 'border-cyan-500',
+        text: 'text-cyan-900',
+        badge: 'bg-cyan-100 text-cyan-800',
+        icon: Clock
+      }
+    case 'completed':
+      return {
+        bg: 'bg-green-100',
+        border: 'border-green-500',
+        text: 'text-green-900',
+        badge: 'bg-green-100 text-green-800',
+        icon: CheckCircle
+      }
+    case 'cancelled':
+      return {
+        bg: 'bg-red-100',
+        border: 'border-red-500',
+        text: 'text-red-900',
+        badge: 'bg-red-100 text-red-800',
+        icon: XCircle
+      }
+    case 'no_show':
+      return {
+        bg: 'bg-gray-100',
+        border: 'border-gray-500',
+        text: 'text-gray-900',
+        badge: 'bg-gray-100 text-gray-800',
+        icon: AlertCircle
+      }
+    case 'rescheduled':
+      return {
+        bg: 'bg-yellow-100',
+        border: 'border-yellow-500',
+        text: 'text-yellow-900',
+        badge: 'bg-yellow-100 text-yellow-800',
+        icon: Pause
+      }
+    default:
+      return {
+        bg: 'bg-purple-100',
+        border: 'border-purple-500',
+        text: 'text-purple-900',
+        badge: 'bg-purple-100 text-purple-800',
+        icon: Clock
+      }
+  }
+}
 
 export default function AgendaPage() {
   const { user, cedroUser } = useSupabase()
@@ -306,11 +372,14 @@ export default function AgendaPage() {
                             const topOffset = (startMinutes / 60) * 80 // 80px per hour
                             const height = (durationMinutes / 60) * 80 // Height proportional to duration
 
+                            const statusStyle = getStatusStyle(appointment.status)
+                            const StatusIcon = statusStyle.icon
+
                             return (
                               <div
                                 key={appointment.id}
-                                className={`absolute left-1 right-1 p-2 rounded border-l-4 text-xs overflow-hidden bg-blue-100 border-blue-500 hover:bg-blue-200 transition-colors cursor-pointer shadow-sm ${
-                                  appointment.status === 'cancelled' ? 'opacity-50' : ''
+                                className={`absolute left-1 right-1 p-2 rounded border-l-4 text-xs overflow-hidden ${statusStyle.bg} ${statusStyle.border} hover:opacity-90 transition-all cursor-pointer shadow-sm hover:shadow-md ${
+                                  appointment.status === 'cancelled' ? 'opacity-60' : ''
                                 }`}
                                 style={{
                                   top: `${topOffset}px`,
@@ -322,13 +391,16 @@ export default function AgendaPage() {
                                   handleEditAppointment(appointment)
                                 }}
                               >
-                                <div className="font-medium truncate">
-                                  {format(parseISO(appointment.start_at), 'HH:mm')}
+                                <div className="flex items-center justify-between gap-1">
+                                  <div className="font-medium truncate">
+                                    {format(parseISO(appointment.start_at), 'HH:mm')}
+                                  </div>
+                                  <StatusIcon className="h-3 w-3 flex-shrink-0" />
                                 </div>
-                                <div className="truncate text-gray-700 font-semibold">
+                                <div className={`truncate font-semibold ${statusStyle.text}`}>
                                   {appointment.patient_name}
                                 </div>
-                                <div className="text-gray-600 truncate">
+                                <div className={`truncate text-xs opacity-75`}>
                                   {appointment.therapist_name}
                                 </div>
                               </div>
@@ -429,11 +501,14 @@ export default function AgendaPage() {
                               const topOffset = (startMinutes / 60) * 80 // 80px per hour
                               const height = (durationMinutes / 60) * 80 // Height proportional to duration
 
+                              const statusStyle = getStatusStyle(appointment.status)
+                              const StatusIcon = statusStyle.icon
+
                               return (
                                 <div
                                   key={appointment.id}
-                                  className={`absolute left-0.5 right-0.5 p-1 rounded border-l-4 text-xs overflow-hidden bg-blue-100 border-blue-500 hover:bg-blue-200 transition-colors cursor-pointer shadow-sm ${
-                                    appointment.status === 'cancelled' ? 'opacity-50' : ''
+                                  className={`absolute left-0.5 right-0.5 p-1 rounded border-l-4 text-xs overflow-hidden ${statusStyle.bg} ${statusStyle.border} hover:opacity-90 transition-all cursor-pointer shadow-sm hover:shadow-md ${
+                                    appointment.status === 'cancelled' ? 'opacity-60' : ''
                                   }`}
                                   style={{
                                     top: `${topOffset}px`,
@@ -445,10 +520,13 @@ export default function AgendaPage() {
                                     handleEditAppointment(appointment)
                                   }}
                                 >
-                                  <div className="font-medium truncate text-gray-900">
-                                    {format(parseISO(appointment.start_at), 'HH:mm')}
+                                  <div className="flex items-center justify-between gap-0.5">
+                                    <div className="font-medium truncate">
+                                      {format(parseISO(appointment.start_at), 'HH:mm')}
+                                    </div>
+                                    <StatusIcon className="h-2.5 w-2.5 flex-shrink-0" />
                                   </div>
-                                  <div className="truncate text-gray-700">
+                                  <div className={`truncate font-semibold text-xs ${statusStyle.text}`}>
                                     {appointment.patient_name}
                                   </div>
                                 </div>
@@ -736,55 +814,56 @@ export default function AgendaPage() {
   )
 }
 
+// Status Labels helper
+const getStatusLabel = (status: string) => {
+  switch (status) {
+    case 'scheduled': return 'Agendado'
+    case 'confirmed': return 'Confirmado'
+    case 'completed': return 'Concluído'
+    case 'cancelled': return 'Cancelado'
+    case 'no_show': return 'Não Compareceu'
+    case 'rescheduled': return 'Remarcado'
+    default: return status
+  }
+}
+
 // Appointment Card Component
-const AppointmentCard = memo(function AppointmentCard({ 
-  appointment, 
-  onUpdate, 
-  onEdit, 
+const AppointmentCard = memo(function AppointmentCard({
+  appointment,
+  onUpdate,
+  onEdit,
   onView,
   compact = false
-}: { 
-  appointment: Appointment; 
+}: {
+  appointment: Appointment;
   onUpdate: () => void;
   onEdit: (appointment: Appointment) => void;
   onView: (appointment: Appointment) => void;
   compact?: boolean;
 }) {
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'scheduled': return 'default'
-      case 'completed': return 'secondary'
-      case 'cancelled': return 'destructive'
-      case 'no_show': return 'outline'
-      default: return 'secondary'
-    }
-  }
-
-  const getStatusLabel = (status: string) => {
-    switch (status) {
-      case 'scheduled': return 'Agendado'
-      case 'completed': return 'Concluído'
-      case 'cancelled': return 'Cancelado'
-      case 'no_show': return 'Não Compareceu'
-      default: return status
-    }
-  }
+  const statusStyle = getStatusStyle(appointment.status)
+  const StatusIcon = statusStyle.icon
 
   if (compact) {
     return (
-      <div className={`p-2 text-xs bg-blue-100 rounded border-l-2 border-blue-500 transition-colors hover:bg-blue-200 group ${
-        appointment.status === 'cancelled' ? 'opacity-50' : ''
+      <div className={`p-2 text-xs rounded border-l-2 transition-all hover:shadow-md group ${
+        statusStyle.bg
+      } ${statusStyle.border} ${
+        appointment.status === 'cancelled' ? 'opacity-60' : ''
       }`}>
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-1">
           <div className="flex-1 min-w-0">
-            <div className="font-medium truncate">
-              {format(parseISO(appointment.start_at), 'HH:mm')}
+            <div className="flex items-center gap-1 mb-0.5">
+              <div className="font-medium truncate">
+                {format(parseISO(appointment.start_at), 'HH:mm')}
+              </div>
+              <StatusIcon className="h-3 w-3 flex-shrink-0" />
             </div>
-            <div className="truncate text-gray-600">
+            <div className={`truncate ${statusStyle.text}`}>
               {appointment.patient_name}
             </div>
           </div>
-          <div className="flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
+          <div className="flex items-center space-x-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
             <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => onEdit(appointment)}>
               <Edit className="h-3 w-3" />
             </Button>
@@ -798,28 +877,30 @@ const AppointmentCard = memo(function AppointmentCard({
   }
 
   return (
-    <div className={`flex items-center justify-between p-4 border rounded-lg transition-colors hover:bg-gray-50 ${
-      appointment.status === 'cancelled' ? 'opacity-50' : ''
+    <div className={`flex items-center justify-between p-4 border rounded-lg transition-all hover:shadow-md hover:border-gray-400 ${
+      statusStyle.bg
+    } ${
+      appointment.status === 'cancelled' ? 'opacity-60' : ''
     }`}>
       <div className="flex items-center space-x-4">
-        <div className="flex items-center justify-center w-12 h-12 bg-blue-100 rounded-full">
-          <Clock className="h-6 w-6 text-blue-600" />
+        <div className={`flex items-center justify-center w-12 h-12 ${statusStyle.bg} rounded-full border-2 ${statusStyle.border}`}>
+          <StatusIcon className="h-6 w-6" style={{ color: statusStyle.border.replace('border-', '').replace('-500', '') }} />
         </div>
         <div>
           <div className="flex items-center space-x-2">
-            <h3 className="font-medium">{appointment.patient_name}</h3>
-            <Badge variant={getStatusColor(appointment.status)}>
+            <h3 className={`font-semibold ${statusStyle.text}`}>{appointment.patient_name}</h3>
+            <Badge className={statusStyle.badge}>
               {getStatusLabel(appointment.status)}
             </Badge>
           </div>
-          <p className="text-sm text-gray-500">{appointment.service_name}</p>
-          <div className="flex items-center space-x-4 text-xs text-gray-400 mt-1">
-            <span className="flex items-center">
-              <Clock className="mr-1 h-3 w-3" />
+          <p className="text-sm text-gray-600">{appointment.service_name}</p>
+          <div className="flex items-center space-x-4 text-xs text-gray-500 mt-1">
+            <span className="flex items-center gap-1">
+              <Clock className="h-3 w-3" />
               {format(parseISO(appointment.start_at), 'HH:mm')} - {format(parseISO(appointment.end_at), 'HH:mm')}
             </span>
-            <span className="flex items-center">
-              <User className="mr-1 h-3 w-3" />
+            <span className="flex items-center gap-1">
+              <User className="h-3 w-3" />
               {appointment.therapist_name}
             </span>
           </div>
