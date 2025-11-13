@@ -116,7 +116,7 @@ export async function GET(
     // 3. Processar eventos (mesmo código do webhook)
     let processedCount = 0;
     let ignoredCount = 0;
-    const errors = [];
+    const errors: Array<{ eventId: string; error: string }> = [];
 
     for (const event of events) {
       try {
