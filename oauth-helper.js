@@ -9,7 +9,10 @@ const axios = require('axios');
 
 const CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
 const CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
-const REDIRECT_URI = 'http://localhost:3001/callback';
+// Use ngrok URL if available (for remote authorization)
+// Example: REDIRECT_BASE_URL="https://3a4b-xxx.ngrok.io"
+const REDIRECT_BASE_URL = process.env.REDIRECT_BASE_URL || 'http://localhost:3001';
+const REDIRECT_URI = `${REDIRECT_BASE_URL}/callback`;
 
 if (!CLIENT_ID || !CLIENT_SECRET) {
   console.error('\n❌ Missing environment variables!\n');
