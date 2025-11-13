@@ -340,19 +340,31 @@ export default function AgendaPage() {
   }, [appointments, debouncedSearchTerm, selectedTherapist, selectedPatient])
 
   const getAppointmentsByDate = useCallback((date: Date) => {
-    const dateStr = format(date, 'yyyy-MM-dd')
+    // Use local date string (YYYY-MM-DD) without timezone conversion
+    const year = date.getFullYear()
+    const month = String(date.getMonth() + 1).padStart(2, '0')
+    const day = String(date.getDate()).padStart(2, '0')
+    const dateStr = `${year}-${month}-${day}`
+
     const dayAppointments = getFilteredAppointments.filter(appointment => {
-      // Parse the start_at string to Date and format it to compare dates
-      const appointmentDate = format(new Date(appointment.start_at), 'yyyy-MM-dd')
-      return appointmentDate === dateStr
+      if (!appointment.start_at) return false
+
+      // Parse appointment date without timezone conversion
+      const apptDate = new Date(appointment.start_at)
+      const apptYear = apptDate.getFullYear()
+      const apptMonth = String(apptDate.getMonth() + 1).padStart(2, '0')
+      const apptDay = String(apptDate.getDate()).padStart(2, '0')
+      const apptDateStr = `${apptYear}-${apptMonth}-${apptDay}`
+
+      return apptDateStr === dateStr
     })
-    console.log('🗓️ Getting appointments for date:', { 
-      date, 
-      dateStr, 
+
+    console.log('🗓️ Getting appointments for date:', {
+      date: dateStr,
       totalAppointments: appointments.length,
       filteredAppointments: getFilteredAppointments.length,
       dayAppointments: dayAppointments.length,
-      appointments: dayAppointments
+      sampleAppointment: dayAppointments[0]
     })
     return dayAppointments
   }, [getFilteredAppointments, appointments.length])
@@ -442,13 +454,19 @@ export default function AgendaPage() {
                 {/* Appointments Grid */}
                 <div className="flex-1 relative border-l border-gray-200">
                   {loading ? (
-                    <div className="p-4">
-                      <AppointmentListSkeleton count={5} />
+                    <div className="flex items-center justify-center h-full">
+                      <div className="text-center space-y-4">
+                        <div className="animate-spin">
+                          <CalendarIcon className="h-12 w-12 text-blue-500 mx-auto" />
+                        </div>
+                        <p className="text-sm text-gray-600">Carregando agendamentos...</p>
+                      </div>
                     </div>
                   ) : dayAppointments.length === 0 ? (
                     <div className="text-center py-12 text-gray-500">
                       <CalendarIcon className="mx-auto h-12 w-12 text-gray-400 mb-2" />
-                      <p className="text-sm">Nenhum agendamento para este dia</p>
+                      <p className="text-sm font-medium mb-1">Nenhum agendamento para este dia</p>
+                      <p className="text-xs text-gray-400">Clique em qualquer horário para criar um novo agendamento</p>
                     </div>
                   ) : (
                     <>
@@ -497,28 +515,30 @@ export default function AgendaPage() {
                                   handleEditAppointment(appointment)
                                 }}
                               >
-                                <div className="flex items-center justify-between gap-1">
-                                  <div className="font-medium truncate">
+                                <div className="flex items-center justify-between gap-0.5 mb-0.5">
+                                  <div className="font-bold text-xs">
                                     {format(parseISO(appointment.start_at), 'HH:mm')}
                                   </div>
-                                  <div className="flex items-center gap-1">
-                                    <StatusIcon className="h-3 w-3 flex-shrink-0" />
+                                  <div className="flex items-center gap-0.5">
+                                    <StatusIcon className="h-2.5 w-2.5 flex-shrink-0" />
                                     {appointment.origin === 'google' && (
-                                      <span className="text-blue-600" title="Google Calendar">📅</span>
+                                      <span title="Google Calendar">📅</span>
                                     )}
                                   </div>
                                 </div>
-                                <div className={`truncate font-semibold ${statusStyle.text}`}>
+                                <div className={`truncate font-semibold text-xs ${statusStyle.text}`}>
                                   {appointment.patient_name}
                                 </div>
-                                {appointment.summary && appointment.summary !== 'Sessão - Cedro' && (
-                                  <div className="truncate text-xs italic opacity-75">
-                                    {appointment.summary}
+                                {appointment.service_name && (
+                                  <div className="truncate text-xs opacity-75 leading-tight">
+                                    {appointment.service_name}
                                   </div>
                                 )}
-                                <div className={`truncate text-xs opacity-75`}>
-                                  {appointment.therapist_name}
-                                </div>
+                                {appointment.summary && appointment.summary !== 'Sessão - Cedro' && (
+                                  <div className="truncate text-xs italic opacity-70 text-gray-700 leading-tight">
+                                    &quot;{appointment.summary}&quot;
+                                  </div>
+                                )}
                               </div>
                             )
                           })}
@@ -644,23 +664,28 @@ export default function AgendaPage() {
                                     handleEditAppointment(appointment)
                                   }}
                                 >
-                                  <div className="flex items-center justify-between gap-0.5">
-                                    <div className="font-medium truncate">
+                                  <div className="flex items-center justify-between gap-0.5 mb-0.5">
+                                    <div className="font-bold text-xs">
                                       {format(parseISO(appointment.start_at), 'HH:mm')}
                                     </div>
                                     <div className="flex items-center gap-0.5">
-                                      <StatusIcon className="h-2.5 w-2.5 flex-shrink-0" />
+                                      <StatusIcon className="h-2 w-2 flex-shrink-0" />
                                       {appointment.origin === 'google' && (
-                                        <span className="text-blue-600 text-xs" title="Google Calendar">📅</span>
+                                        <span title="Google Calendar">📅</span>
                                       )}
                                     </div>
                                   </div>
                                   <div className={`truncate font-semibold text-xs ${statusStyle.text}`}>
                                     {appointment.patient_name}
                                   </div>
+                                  {appointment.service_name && (
+                                    <div className="truncate text-xs opacity-70 leading-tight">
+                                      {appointment.service_name}
+                                    </div>
+                                  )}
                                   {appointment.summary && appointment.summary !== 'Sessão - Cedro' && (
-                                    <div className="truncate text-xs italic opacity-75 leading-tight">
-                                      {appointment.summary}
+                                    <div className="truncate text-xs italic opacity-65 leading-tight text-gray-700">
+                                      &quot;{appointment.summary}&quot;
                                     </div>
                                   )}
                                 </div>
@@ -741,22 +766,27 @@ export default function AgendaPage() {
                       return (
                         <div
                           key={appointment.id}
-                          className={`appointment-item text-xs p-1 rounded truncate cursor-pointer transition-all hover:shadow-sm ${appointmentStatusStyle.bg} hover:opacity-80 ${
+                          className={`appointment-item text-xs p-1 rounded cursor-pointer transition-all hover:shadow-sm ${appointmentStatusStyle.bg} hover:opacity-80 ${
                             appointment.status === 'cancelled' ? 'opacity-60' : ''
                           }`}
                           onClick={(e) => {
                             e.stopPropagation()
                             handleEditAppointment(appointment)
                           }}
-                          title={appointment.summary || ''}
+                          title={`${appointment.patient_name}${appointment.summary ? ` - ${appointment.summary}` : ''}`}
                         >
-                          <div className="flex items-center gap-1">
-                            <span>{format(parseISO(appointment.start_at), 'HH:mm')}</span>
+                          <div className="flex items-center gap-0.5 mb-0.5">
+                            <span className="font-bold">{format(parseISO(appointment.start_at), 'HH:mm')}</span>
                             {appointment.origin === 'google' && (
                               <span title="Google Calendar">📅</span>
                             )}
                           </div>
-                          <div className="truncate">{appointment.patient_name}</div>
+                          <div className="truncate font-semibold leading-tight">{appointment.patient_name}</div>
+                          {appointment.summary && appointment.summary !== 'Sessão - Cedro' && (
+                            <div className="truncate text-xs italic opacity-70 leading-tight">
+                              &quot;{appointment.summary}&quot;
+                            </div>
+                          )}
                         </div>
                       )
                     })}
