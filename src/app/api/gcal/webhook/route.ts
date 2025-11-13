@@ -16,6 +16,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { googleCalendarService } from '@/lib/google-calendar/service';
+import type { GoogleCalendarEvent } from '@/lib/google-calendar/types';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -109,7 +110,7 @@ export async function POST(request: NextRequest) {
     let syncToken = syncState?.sync_token;
 
     // 3. Determinar se é primeiro sync ou incremental
-    let events = [];
+    let events: GoogleCalendarEvent[] = [];
 
     if (resourceState === 'sync' || !syncToken) {
       // Primeiro sync: buscar janela móvel (últimos 30 dias + próximos 365)
@@ -145,7 +146,7 @@ export async function POST(request: NextRequest) {
     // 4. Processar cada evento
     let processedCount = 0;
     let ignoredCount = 0;
-    const errors = [];
+    const errors: Array<{ eventId: string; error: string }> = [];
 
     for (const event of events) {
       try {
