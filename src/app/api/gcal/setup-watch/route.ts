@@ -140,7 +140,10 @@ export async function POST(request: NextRequest) {
     }
 
     const resourceId = watchResponse.resourceId;
-    const expiration = watchResponse.expiration;
+    // Converter expiration de timestamp em ms para ISO string
+    const expiration = watchResponse.expiration
+      ? new Date(parseInt(watchResponse.expiration)).toISOString()
+      : new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(); // Fallback para 24h a partir de agora
 
     // 4. Inserir/atualizar google_calendar_sync_state (se não existe)
     const { error: syncStateError } = await supabase

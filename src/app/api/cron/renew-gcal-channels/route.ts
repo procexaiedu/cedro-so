@@ -104,13 +104,18 @@ export async function POST(request: NextRequest) {
         );
 
         // 3. Atualizar canal mantendo sync_token (IMPORTANTE!)
+        // Converter expiration de timestamp em ms para ISO string
+        const newExpiration = watchResponse.expiration
+          ? new Date(parseInt(watchResponse.expiration)).toISOString()
+          : new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+
         const { error: updateError } = await supabase
           .from('google_calendar_channels')
           .update({
             channel_id: newChannelId,
             resource_id: watchResponse.resourceId,
             channel_token: newChannelToken,
-            expiration: watchResponse.expiration,
+            expiration: newExpiration,
             updated_at: new Date().toISOString(),
           })
           .eq('id', channel.id);
