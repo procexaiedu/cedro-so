@@ -39,12 +39,6 @@ interface SyncJob {
   processed_at: string | null;
 }
 
-interface AppointmentWithTherapist extends CedroAppointmentForSync {
-  therapist: {
-    google_calendar_id: string;
-  };
-}
-
 /**
  * POST /api/cron/process-gcal-sync
  * Processa fila de sincronização
@@ -156,7 +150,7 @@ export async function POST(request: NextRequest) {
         switch (job.action) {
           case 'create': {
             await googleCalendarService.createEvent(
-              appointmentWithTherapist,
+              appointment as CedroAppointmentForSync,
               calendarId
             );
             break;
@@ -164,7 +158,7 @@ export async function POST(request: NextRequest) {
 
           case 'update': {
             await googleCalendarService.updateEvent(
-              appointmentWithTherapist,
+              appointment as CedroAppointmentForSync,
               {
                 summary: appointment.summary,
                 description: appointment.notes,
