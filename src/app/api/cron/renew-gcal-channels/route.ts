@@ -17,17 +17,8 @@ import { createClient } from '@supabase/supabase-js';
 import { googleCalendarService } from '@/lib/google-calendar/service';
 import { v4 as uuidv4 } from 'uuid';
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
-
 const CRON_SECRET = process.env.CRON_SECRET;
 const APP_URL = process.env.APP_URL;
-
-if (!APP_URL) {
-  throw new Error('Missing APP_URL environment variable');
-}
 
 interface ChannelRecord {
   id: string;
@@ -55,6 +46,17 @@ export async function POST(request: NextRequest) {
         { status: 401 }
       );
     }
+
+    // Validar APP_URL
+    if (!APP_URL) {
+      throw new Error('Missing APP_URL environment variable');
+    }
+
+    // Criar cliente Supabase após validação
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
 
     console.log('Starting Google Calendar channels renewal...');
 
@@ -183,6 +185,12 @@ export async function GET(request: NextRequest) {
         { status: 401 }
       );
     }
+
+    // Criar cliente Supabase após validação
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
 
     // Contar status dos canais
     const { data: activeChannels } = await supabase

@@ -18,11 +18,6 @@ import { createClient } from '@supabase/supabase-js';
 import { googleCalendarService } from '@/lib/google-calendar/service';
 import type { CedroAppointmentForSync } from '@/lib/google-calendar/types';
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
-
 const CRON_SECRET = process.env.CRON_SECRET;
 const BATCH_SIZE = 10; // Processar até 10 jobs por execução
 const BACKOFF_DELAYS = [2000, 4000, 8000, 16000]; // ms para retry (2s, 4s, 8s, 16s)
@@ -54,6 +49,12 @@ export async function POST(request: NextRequest) {
         { status: 401 }
       );
     }
+
+    // Criar cliente Supabase após validação
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
 
     console.log('Starting Google Calendar sync queue processing...');
 
@@ -274,6 +275,12 @@ export async function GET(request: NextRequest) {
         { status: 401 }
       );
     }
+
+    // Criar cliente Supabase após validação
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
 
     // Contar jobs por status
     const { data: stats } = await supabase

@@ -15,11 +15,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { googleCalendarService } from '@/lib/google-calendar/service';
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
-
 interface ResyncParams {
   therapist_id: string;
 }
@@ -56,6 +51,12 @@ export async function GET(
   context: { params: ResyncParams }
 ) {
   try {
+    // Criar cliente Supabase
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
+
     const { therapist_id } = context.params;
     const { searchParams } = new URL(request.url);
 

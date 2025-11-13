@@ -17,16 +17,7 @@ import { createClient } from '@supabase/supabase-js';
 import { googleCalendarService } from '@/lib/google-calendar/service';
 import { v4 as uuidv4 } from 'uuid';
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
-
 const APP_URL = process.env.APP_URL;
-
-if (!APP_URL) {
-  throw new Error('Missing APP_URL environment variable');
-}
 
 interface SetupWatchRequest {
   therapist_id: string;
@@ -66,6 +57,17 @@ export async function POST(request: NextRequest) {
   try {
     // Autenticação: se necessário, validar token JWT aqui
     // Por enquanto, assumir que a chamada é autorizada (de rota protegida)
+
+    // Validar APP_URL
+    if (!APP_URL) {
+      throw new Error('Missing APP_URL environment variable');
+    }
+
+    // Criar cliente Supabase
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
 
     const body = (await request.json()) as SetupWatchRequest;
     const { therapist_id } = body;
@@ -236,6 +238,12 @@ export async function POST(request: NextRequest) {
  */
 export async function GET(request: NextRequest) {
   try {
+    // Criar cliente Supabase
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
+
     const { searchParams } = new URL(request.url);
     const therapistId = searchParams.get('therapist_id');
 

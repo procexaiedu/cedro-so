@@ -18,11 +18,6 @@ import { createClient } from '@supabase/supabase-js';
 import { googleCalendarService } from '@/lib/google-calendar/service';
 import type { GoogleCalendarEvent } from '@/lib/google-calendar/types';
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
-
 interface WebhookHeaders {
   'x-goog-channel-id'?: string;
   'x-goog-resource-id'?: string;
@@ -45,6 +40,12 @@ interface ChannelRecord {
  */
 export async function POST(request: NextRequest) {
   try {
+    // Criar cliente Supabase
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
+
     // Extrair headers do webhook
     const channelId = request.headers.get('x-goog-channel-id');
     const resourceId = request.headers.get('x-goog-resource-id');
