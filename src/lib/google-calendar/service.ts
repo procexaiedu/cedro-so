@@ -16,6 +16,7 @@ import type {
   CedroAppointmentForSync,
 } from './types';
 import { createClient } from '@supabase/supabase-js';
+import { v4 as uuidv4 } from 'uuid';
 
 // Supabase client para persistir dados
 const supabase = createClient(
@@ -346,7 +347,7 @@ export class GoogleCalendarService {
       const response = await calendar.events.watch({
         calendarId,
         requestBody: {
-          id: `cedro-${calendarId}-${Date.now()}`,
+          id: uuidv4().replace(/-/g, ''), // Remove hífens para ser mais compatível
           type: 'web_hook',
           address,
           token,
