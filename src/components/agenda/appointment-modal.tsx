@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Calendar } from '@/components/ui/calendar'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Badge } from '@/components/ui/badge'
-import { CalendarIcon, Clock, User, Stethoscope, Trash2, Save, X } from 'lucide-react'
+import { CalendarIcon, Clock, User, Stethoscope, Trash2, Save, X, Plus } from 'lucide-react'
 import { format, parseISO, addMinutes } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { useToast } from '@/hooks/use-toast'
@@ -23,6 +23,7 @@ import {
   type Appointment
 } from '@/hooks/use-appointments-adapter'
 import { useRefreshOnModalOpen } from '@/hooks/use-realtime-appointments'
+import { useCreatePatient } from '@/hooks/use-patients-new'
 import { isPatientLinkedToTherapist } from '@/data/agenda'
 
 type AppointmentModalProps = {
@@ -80,10 +81,19 @@ export function AppointmentModal({
   const isEditing = mode === 'edit'
   const isCreating = mode === 'create'
 
+  // Quick patient creation state
+  const [showQuickCreatePatient, setShowQuickCreatePatient] = useState(false)
+  const [quickPatientForm, setQuickPatientForm] = useState({
+    full_name: '',
+    email: '',
+    phone: ''
+  })
+
   // React Query hooks para mutations
   const createMutation = useCreateAppointment()
   const updateMutation = useUpdateAppointment()
   const deleteMutation = useDeleteAppointment()
+  const createPatientMutation = useCreatePatient()
 
   // Hook para refresh automático de dados
   const { refreshAppointmentData } = useRefreshOnModalOpen()
@@ -291,6 +301,52 @@ export function AppointmentModal({
     })
   }
 
+  const handleQuickCreatePatient = async () => {
+    if (!quickPatientForm.full_name.trim()) {
+      toast({
+        title: "Erro",
+        description: "Nome do paciente é obrigatório",
+        variant: "destructive"
+      })
+      return
+    }
+
+    createPatientMutation.mutate(
+      {
+        full_name: quickPatientForm.full_name,
+        email: quickPatientForm.email || null,
+        phone: quickPatientForm.phone || null,
+        therapist_id: formData.therapist_id || null,
+        // Default values for other fields
+        birth_date: null,
+        cpf: null,
+        gender: null,
+        is_christian: null,
+        origin: null,
+        marital_status: null,
+        occupation: null,
+        notes: null,
+        address_json: null,
+        tags_text: [],
+        is_on_hold: false
+      },
+      {
+        onSuccess: (newPatient) => {
+          // Auto-select the newly created patient
+          setFormData(prev => ({ ...prev, patient_id: newPatient.id }))
+          // Reset the quick create form
+          setQuickPatientForm({ full_name: '', email: '', phone: '' })
+          // Close the quick create dialog
+          setShowQuickCreatePatient(false)
+          toast({
+            title: "Sucesso",
+            description: "Paciente criado e selecionado com sucesso"
+          })
+        }
+      }
+    )
+  }
+
   const getModalTitle = () => {
     switch (mode) {
       case 'create': return 'Novo Agendamento'
@@ -318,7 +374,20 @@ export function AppointmentModal({
         <div className="space-y-6">
           {/* Patient Selection */}
           <div className="space-y-2">
-            <Label htmlFor="patient">Paciente *</Label>
+            <div className="flex items-center justify-between">
+              <Label htmlFor="patient">Paciente *</Label>
+              {!isReadOnly && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowQuickCreatePatient(true)}
+                  className="h-6 px-2 gap-1 text-xs"
+                >
+                  <Plus className="h-3 w-3" />
+                  Criar Paciente
+                </Button>
+              )}
+            </div>
             {isReadOnly ? (
               <div className="flex items-center gap-2 p-2 border rounded-md bg-gray-50">
                 <User className="h-4 w-4 text-gray-500" />
@@ -528,20 +597,20 @@ export function AppointmentModal({
               </Button>
             )}
           </div>
-          
+
           <div className="flex gap-2">
-            <Button 
-              variant="outline" 
-              onClick={onClose} 
+            <Button
+              variant="outline"
+              onClick={onClose}
               disabled={createMutation.isPending || updateMutation.isPending || deleteMutation.isPending}
             >
               <X className="h-4 w-4 mr-2" />
               {isReadOnly ? 'Fechar' : 'Cancelar'}
             </Button>
-            
+
             {!isReadOnly && (
-              <Button 
-                onClick={handleSave} 
+              <Button
+                onClick={handleSave}
                 disabled={createMutation.isPending || updateMutation.isPending || loadingLinkedPatients || loadingLinkedTherapists}
               >
                 <Save className="h-4 w-4 mr-2" />
@@ -551,6 +620,72 @@ export function AppointmentModal({
           </div>
         </div>
       </DialogContent>
+
+      {/* Quick Create Patient Dialog */}
+      <Dialog open={showQuickCreatePatient} onOpenChange={setShowQuickCreatePatient}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <User className="h-5 w-5" />
+              Criar Novo Paciente
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="quick-patient-name">Nome *</Label>
+              <Input
+                id="quick-patient-name"
+                placeholder="Nome completo do paciente"
+                value={quickPatientForm.full_name}
+                onChange={(e) => setQuickPatientForm(prev => ({ ...prev, full_name: e.target.value }))}
+                disabled={createPatientMutation.isPending}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="quick-patient-email">Email</Label>
+              <Input
+                id="quick-patient-email"
+                type="email"
+                placeholder="email@example.com"
+                value={quickPatientForm.email}
+                onChange={(e) => setQuickPatientForm(prev => ({ ...prev, email: e.target.value }))}
+                disabled={createPatientMutation.isPending}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="quick-patient-phone">Telefone</Label>
+              <Input
+                id="quick-patient-phone"
+                placeholder="(11) 99999-9999"
+                value={quickPatientForm.phone}
+                onChange={(e) => setQuickPatientForm(prev => ({ ...prev, phone: e.target.value }))}
+                disabled={createPatientMutation.isPending}
+              />
+            </div>
+          </div>
+
+          <div className="flex gap-2 pt-4">
+            <Button
+              variant="outline"
+              onClick={() => setShowQuickCreatePatient(false)}
+              disabled={createPatientMutation.isPending}
+              className="flex-1"
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleQuickCreatePatient}
+              disabled={createPatientMutation.isPending}
+              className="flex-1"
+            >
+              {createPatientMutation.isPending ? 'Criando...' : 'Criar Paciente'}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </Dialog>
   )
 }
