@@ -72,7 +72,7 @@ export async function getSyncedAppointments(
       throw new Error(`Failed to fetch synced appointments: ${error.message}`);
     }
 
-    return (data || []) as Appointment[];
+    return (data || []) as any[];
   } catch (error) {
     console.error('Error fetching synced appointments:', error);
     throw error;
@@ -120,7 +120,7 @@ export async function getUnlinkedGoogleAppointments(
       throw new Error(`Failed to fetch unlinked appointments: ${error.message}`);
     }
 
-    return (data || []) as Appointment[];
+    return (data || []) as any[];
   } catch (error) {
     console.error('Error fetching unlinked appointments:', error);
     throw error;

@@ -103,7 +103,7 @@ export class GoogleCalendarService {
         htmlLink: event.htmlLink,
       });
 
-      return event;
+      return event as any;
     } catch (error) {
       await this.logSync({
         event_id: appointment.id,
@@ -195,7 +195,7 @@ export class GoogleCalendarService {
         etag: event.etag,
       });
 
-      return event;
+      return event as any;
     } catch (error) {
       await this.logSync({
         event_id: appointment.external_event_id,

@@ -69,6 +69,16 @@ export interface Appointment extends Timestamps {
   origin_message_id: string | null
   notes: string | null
   meet_link: string | null
+  // Google Calendar sync fields
+  origin?: 'system' | 'google'
+  summary?: string
+  external_event_id?: string
+  external_calendar_id?: string
+  source_updated_at?: string
+  recurring_event_id?: string
+  ical_uid?: string
+  html_link?: string
+  gcal_etag?: string
 }
 
 export interface AppointmentWithDetails extends Appointment {
