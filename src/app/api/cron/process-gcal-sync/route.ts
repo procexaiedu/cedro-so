@@ -136,16 +136,19 @@ export async function POST(request: NextRequest) {
           );
         }
 
-        const appointmentWithTherapist = appointment as AppointmentWithTherapist;
+        // Handle therapist as array or object from Supabase
+        const therapistData = Array.isArray(appointment.therapist)
+          ? appointment.therapist[0]
+          : appointment.therapist;
 
         // Verificar se terapeuta tem Google Calendar configurado
-        if (!appointmentWithTherapist.therapist?.google_calendar_id) {
+        if (!therapistData?.google_calendar_id) {
           throw new Error(
-            `Therapist has no Google Calendar configured (therapist_id: ${appointmentWithTherapist.therapist_id})`
+            `Therapist has no Google Calendar configured (therapist_id: ${appointment.therapist_id})`
           );
         }
 
-        const calendarId = appointmentWithTherapist.therapist.google_calendar_id;
+        const calendarId = therapistData.google_calendar_id;
 
         // 3. Executar ação apropriada
         console.log(`Processing job ${job.id}: ${job.action} for appointment ${job.appointment_id}`);
