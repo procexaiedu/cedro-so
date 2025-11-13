@@ -25,7 +25,8 @@ import {
   CheckCircle,
   AlertCircle,
   XCircle,
-  Pause
+  Pause,
+  ExternalLink
 } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -395,11 +396,21 @@ export default function AgendaPage() {
                                   <div className="font-medium truncate">
                                     {format(parseISO(appointment.start_at), 'HH:mm')}
                                   </div>
-                                  <StatusIcon className="h-3 w-3 flex-shrink-0" />
+                                  <div className="flex items-center gap-1">
+                                    <StatusIcon className="h-3 w-3 flex-shrink-0" />
+                                    {appointment.origin === 'google' && (
+                                      <span className="text-blue-600" title="Google Calendar">📅</span>
+                                    )}
+                                  </div>
                                 </div>
                                 <div className={`truncate font-semibold ${statusStyle.text}`}>
                                   {appointment.patient_name}
                                 </div>
+                                {appointment.summary && appointment.summary !== 'Sessão - Cedro' && (
+                                  <div className="truncate text-xs italic opacity-75">
+                                    {appointment.summary}
+                                  </div>
+                                )}
                                 <div className={`truncate text-xs opacity-75`}>
                                   {appointment.therapist_name}
                                 </div>
@@ -524,11 +535,21 @@ export default function AgendaPage() {
                                     <div className="font-medium truncate">
                                       {format(parseISO(appointment.start_at), 'HH:mm')}
                                     </div>
-                                    <StatusIcon className="h-2.5 w-2.5 flex-shrink-0" />
+                                    <div className="flex items-center gap-0.5">
+                                      <StatusIcon className="h-2.5 w-2.5 flex-shrink-0" />
+                                      {appointment.origin === 'google' && (
+                                        <span className="text-blue-600 text-xs" title="Google Calendar">📅</span>
+                                      )}
+                                    </div>
                                   </div>
                                   <div className={`truncate font-semibold text-xs ${statusStyle.text}`}>
                                     {appointment.patient_name}
                                   </div>
+                                  {appointment.summary && appointment.summary !== 'Sessão - Cedro' && (
+                                    <div className="truncate text-xs italic opacity-75 leading-tight">
+                                      {appointment.summary}
+                                    </div>
+                                  )}
                                 </div>
                               )
                             })}
@@ -602,18 +623,30 @@ export default function AgendaPage() {
                     {format(day, 'd')}
                   </div>
                   <div className="space-y-1 mt-1">
-                    {dayAppointments.slice(0, 3).map((appointment) => (
-                      <div
-                        key={appointment.id}
-                        className="appointment-item text-xs p-1 bg-blue-100 rounded truncate cursor-pointer hover:bg-blue-200 transition-colors"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          handleEditAppointment(appointment)
-                        }}
-                      >
-                        {format(parseISO(appointment.start_at), 'HH:mm')} {appointment.patient_name}
-                      </div>
-                    ))}
+                    {dayAppointments.slice(0, 3).map((appointment) => {
+                      const appointmentStatusStyle = getStatusStyle(appointment.status)
+                      return (
+                        <div
+                          key={appointment.id}
+                          className={`appointment-item text-xs p-1 rounded truncate cursor-pointer transition-all hover:shadow-sm ${appointmentStatusStyle.bg} hover:opacity-80 ${
+                            appointment.status === 'cancelled' ? 'opacity-60' : ''
+                          }`}
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            handleEditAppointment(appointment)
+                          }}
+                          title={appointment.summary || ''}
+                        >
+                          <div className="flex items-center gap-1">
+                            <span>{format(parseISO(appointment.start_at), 'HH:mm')}</span>
+                            {appointment.origin === 'google' && (
+                              <span title="Google Calendar">📅</span>
+                            )}
+                          </div>
+                          <div className="truncate">{appointment.patient_name}</div>
+                        </div>
+                      )
+                    })}
                     {dayAppointments.length > 3 && (
                       <div className="text-xs text-gray-500">
                         +{dayAppointments.length - 3} mais
@@ -858,17 +891,39 @@ const AppointmentCard = memo(function AppointmentCard({
                 {format(parseISO(appointment.start_at), 'HH:mm')}
               </div>
               <StatusIcon className="h-3 w-3 flex-shrink-0" />
+              {appointment.origin === 'google' && (
+                <span className="text-blue-600" title="Google Calendar">📅</span>
+              )}
             </div>
-            <div className={`truncate ${statusStyle.text}`}>
+            <div className={`truncate ${statusStyle.text} font-semibold`}>
               {appointment.patient_name}
             </div>
+            {appointment.summary && appointment.summary !== 'Sessão - Cedro' && (
+              <div className="truncate text-gray-700 text-xs italic mt-0.5">
+                {appointment.summary}
+              </div>
+            )}
           </div>
           <div className="flex items-center space-x-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-            <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => onEdit(appointment)}>
-              <Edit className="h-3 w-3" />
+            {appointment.html_link && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-5 w-5 p-0"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  window.open(appointment.html_link, '_blank')
+                }}
+                title="Abrir no Google Calendar"
+              >
+                <ExternalLink className="h-2.5 w-2.5" />
+              </Button>
+            )}
+            <Button variant="ghost" size="sm" className="h-5 w-5 p-0" onClick={() => onEdit(appointment)}>
+              <Edit className="h-2.5 w-2.5" />
             </Button>
-            <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => onView(appointment)}>
-              <MoreHorizontal className="h-3 w-3" />
+            <Button variant="ghost" size="sm" className="h-5 w-5 p-0" onClick={() => onView(appointment)}>
+              <MoreHorizontal className="h-2.5 w-2.5" />
             </Button>
           </div>
         </div>
@@ -882,19 +937,34 @@ const AppointmentCard = memo(function AppointmentCard({
     } ${
       appointment.status === 'cancelled' ? 'opacity-60' : ''
     }`}>
-      <div className="flex items-center space-x-4">
+      <div className="flex items-center space-x-4 flex-1">
         <div className={`flex items-center justify-center w-12 h-12 ${statusStyle.bg} rounded-full border-2 ${statusStyle.border}`}>
           <StatusIcon className="h-6 w-6" style={{ color: statusStyle.border.replace('border-', '').replace('-500', '') }} />
         </div>
-        <div>
-          <div className="flex items-center space-x-2">
+        <div className="flex-1">
+          <div className="flex items-center space-x-2 flex-wrap gap-1">
             <h3 className={`font-semibold ${statusStyle.text}`}>{appointment.patient_name}</h3>
             <Badge className={statusStyle.badge}>
               {getStatusLabel(appointment.status)}
             </Badge>
+            {/* Origin Badge */}
+            {appointment.origin === 'google' && (
+              <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 text-xs">
+                Google Calendar
+              </Badge>
+            )}
           </div>
+
+          {/* Summary if different from default */}
+          {appointment.summary && appointment.summary !== 'Sessão - Cedro' && (
+            <p className="text-sm font-medium text-gray-700 mt-1">
+              {appointment.summary}
+            </p>
+          )}
+
           <p className="text-sm text-gray-600">{appointment.service_name}</p>
-          <div className="flex items-center space-x-4 text-xs text-gray-500 mt-1">
+
+          <div className="flex items-center space-x-4 text-xs text-gray-500 mt-1 flex-wrap gap-2">
             <span className="flex items-center gap-1">
               <Clock className="h-3 w-3" />
               {format(parseISO(appointment.start_at), 'HH:mm')} - {format(parseISO(appointment.end_at), 'HH:mm')}
@@ -906,7 +976,18 @@ const AppointmentCard = memo(function AppointmentCard({
           </div>
         </div>
       </div>
-      <div className="flex items-center space-x-2">
+      <div className="flex items-center space-x-1">
+        {/* Google Calendar Link */}
+        {appointment.html_link && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => window.open(appointment.html_link, '_blank')}
+            title="Abrir no Google Calendar"
+          >
+            <ExternalLink className="h-4 w-4" />
+          </Button>
+        )}
         <Button variant="ghost" size="sm" onClick={() => onEdit(appointment)}>
           <Edit className="h-4 w-4" />
         </Button>
