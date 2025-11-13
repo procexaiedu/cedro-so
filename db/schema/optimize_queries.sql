@@ -29,7 +29,7 @@ CREATE INDEX IF NOT EXISTS idx_patient_therapist_active ON cedro.patient_therapi
 
 -- View otimizada para agendamentos com dados relacionados
 CREATE OR REPLACE VIEW cedro.appointments_with_details AS
-SELECT 
+SELECT
     a.id,
     a.patient_id,
     a.therapist_id,
@@ -38,17 +38,32 @@ SELECT
     a.status,
     a.start_at,
     a.end_at,
+    a.channel,
+    a.origin_message_id,
     a.notes,
+    a.meet_link,
     a.created_at,
     a.updated_at,
+    -- Google Calendar sync fields
+    a.origin,
+    a.summary,
+    a.external_event_id,
+    a.external_calendar_id,
+    a.source_updated_at,
+    a.recurring_event_id,
+    a.ical_uid,
+    a.html_link,
+    a.gcal_etag,
+    -- Related data
     p.full_name as patient_name,
     p.email as patient_email,
     p.phone as patient_phone,
     u.name as therapist_name,
     u.email as therapist_email,
     s.name as service_name,
-    s.duration as service_duration,
-    s.price as service_price
+    s.description as service_description,
+    s.default_duration_min as service_duration,
+    s.base_price_cents as service_price
 FROM cedro.appointments a
 LEFT JOIN cedro.patients p ON a.patient_id = p.id
 LEFT JOIN cedro.users u ON a.therapist_id = u.id
