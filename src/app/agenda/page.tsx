@@ -28,6 +28,7 @@ import {
   Pause,
   ExternalLink
 } from 'lucide-react'
+import { AppointmentPreview } from '@/components/agenda/appointment-preview'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useSupabase } from '@/providers/supabase-provider'
@@ -127,6 +128,8 @@ export default function AgendaPage() {
   const [defaultTime, setDefaultTime] = useState<string | undefined>(undefined)
   const [draggedAppointment, setDraggedAppointment] = useState<Appointment | null>(null)
   const [dragOverHour, setDragOverHour] = useState<number | null>(null)
+  const [previewAppointment, setPreviewAppointment] = useState<Appointment | null>(null)
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false)
 
   // Debounce search term
   const debouncedSearchTerm = useDebounce(searchTerm, 300)
@@ -211,6 +214,17 @@ export default function AgendaPage() {
   const handleViewAppointment = useCallback((appointment: Appointment) => {
     setSelectedAppointment(appointment)
     setModalMode('view')
+    setIsNewAppointmentOpen(true)
+  }, [])
+
+  const handlePreviewAppointment = useCallback((appointment: Appointment) => {
+    setPreviewAppointment(appointment)
+    setIsPreviewOpen(true)
+  }, [])
+
+  const handleEditFromPreview = useCallback((appointment: Appointment) => {
+    setSelectedAppointment(appointment)
+    setModalMode('edit')
     setIsNewAppointmentOpen(true)
   }, [])
 
@@ -587,7 +601,7 @@ export default function AgendaPage() {
                                 onDragEnd={handleDragEnd}
                                 onClick={(e) => {
                                   e.stopPropagation()
-                                  handleEditAppointment(appointment)
+                                  handlePreviewAppointment(appointment)
                                 }}
                               >
                                 <div className="flex items-center justify-between gap-0.5 mb-0.5">
@@ -799,7 +813,7 @@ export default function AgendaPage() {
                                   onDragEnd={handleDragEnd}
                                   onClick={(e) => {
                                     e.stopPropagation()
-                                    handleEditAppointment(appointment)
+                                    handlePreviewAppointment(appointment)
                                   }}
                                 >
                                   <div className="flex items-center justify-between gap-0.5 mb-0.5">
@@ -909,7 +923,7 @@ export default function AgendaPage() {
                           }`}
                           onClick={(e) => {
                             e.stopPropagation()
-                            handleEditAppointment(appointment)
+                            handlePreviewAppointment(appointment)
                           }}
                           title={`${appointment.patient_name}${appointment.summary ? ` - ${appointment.summary}` : ''}`}
                         >
@@ -1108,6 +1122,13 @@ export default function AgendaPage() {
           </Card>
         </div>
       </div>
+
+      <AppointmentPreview
+        appointment={previewAppointment}
+        isOpen={isPreviewOpen}
+        onClose={() => setIsPreviewOpen(false)}
+        onEdit={handleEditFromPreview}
+      />
 
       <Suspense fallback={<div>Carregando...</div>}>
         <LazyAppointmentModal
