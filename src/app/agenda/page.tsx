@@ -36,11 +36,12 @@ import {
   useTherapists,
   usePatientsForAppointments,
   useServices,
+  useUpdateAppointment,
   type Appointment
 } from '@/hooks/use-appointments-adapter'
 import { useDebounce } from '@/hooks/use-debounce'
 import { AppointmentListSkeleton } from '@/components/skeletons/appointment-skeleton'
-import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, addDays, addWeeks, addMonths, subDays, subWeeks, subMonths, isSameDay, parseISO } from 'date-fns'
+import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, addDays, addWeeks, addMonths, subDays, subWeeks, subMonths, isSameDay, parseISO, addMinutes } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { useToast } from '@/hooks/use-toast'
 import { Suspense } from 'react'
@@ -124,9 +125,14 @@ export default function AgendaPage() {
   const [modalMode, setModalMode] = useState<'create' | 'edit' | 'view'>('create')
   const [defaultDate, setDefaultDate] = useState<Date | undefined>(undefined)
   const [defaultTime, setDefaultTime] = useState<string | undefined>(undefined)
+  const [draggedAppointment, setDraggedAppointment] = useState<Appointment | null>(null)
+  const [dragOverHour, setDragOverHour] = useState<number | null>(null)
 
   // Debounce search term
   const debouncedSearchTerm = useDebounce(searchTerm, 300)
+
+  // Update appointment mutation for drag and drop
+  const { mutate: updateAppointmentForReschedule } = useUpdateAppointment()
 
   const getDateRange = () => {
     switch (viewMode) {
@@ -214,6 +220,97 @@ export default function AgendaPage() {
   const handleModalSave = useCallback(() => {
     // React Query will automatically refetch data
   }, [])
+
+  // Drag and drop handlers
+  const handleDragStart = useCallback((e: React.DragEvent, appointment: Appointment) => {
+    e.dataTransfer.effectAllowed = 'move'
+    e.dataTransfer.setData('text/plain', appointment.id)
+    setDraggedAppointment(appointment)
+  }, [])
+
+  const handleDragEnd = useCallback(() => {
+    setDraggedAppointment(null)
+    setDragOverHour(null)
+  }, [])
+
+  const handleDragOver = useCallback((e: React.DragEvent, hour?: number) => {
+    e.preventDefault()
+    e.dataTransfer.dropEffect = 'move'
+    if (hour !== undefined) {
+      setDragOverHour(hour)
+    }
+  }, [])
+
+  const handleDragLeave = useCallback(() => {
+    setDragOverHour(null)
+  }, [])
+
+  const handleDrop = useCallback((e: React.DragEvent, targetDate: Date, hour: number) => {
+    e.preventDefault()
+    e.stopPropagation()
+
+    if (!draggedAppointment) return
+
+    // Don't allow dropping on same time
+    const startHour = new Date(draggedAppointment.start_at).getHours()
+    if (startHour === hour && isSameDay(new Date(draggedAppointment.start_at), targetDate)) {
+      toast({
+        title: 'Info',
+        description: 'Solte em um horário diferente para remarcar'
+      })
+      setDraggedAppointment(null)
+      setDragOverHour(null)
+      return
+    }
+
+    // Calculate duration
+    const startTime = parseISO(draggedAppointment.start_at)
+    const endTime = parseISO(draggedAppointment.end_at)
+    const durationMinutes = (endTime.getTime() - startTime.getTime()) / (1000 * 60)
+
+    // Create new times
+    const newStartDateTime = new Date(targetDate)
+    newStartDateTime.setHours(hour, 0, 0, 0)
+    const newEndDateTime = addMinutes(newStartDateTime, durationMinutes)
+
+    // Update appointment
+    updateAppointmentForReschedule(
+      {
+        id: draggedAppointment.id,
+        data: {
+          patient_id: draggedAppointment.patient_id,
+          therapist_id: draggedAppointment.therapist_id,
+          service_id: draggedAppointment.service_id,
+          care_plan_id: draggedAppointment.care_plan_id,
+          status: draggedAppointment.status,
+          start_at: newStartDateTime.toISOString(),
+          end_at: newEndDateTime.toISOString(),
+          channel: draggedAppointment.channel,
+          origin_message_id: draggedAppointment.origin_message_id,
+          notes: draggedAppointment.notes,
+          meet_link: draggedAppointment.meet_link
+        }
+      },
+      {
+        onSuccess: () => {
+          toast({
+            title: 'Sucesso',
+            description: `Agendamento remarcado para ${format(newStartDateTime, 'dd/MM/yyyy HH:mm', { locale: ptBR })}`
+          })
+        },
+        onError: (error: any) => {
+          toast({
+            title: 'Erro',
+            description: error.message || 'Erro ao remarcar agendamento',
+            variant: 'destructive'
+          })
+        }
+      }
+    )
+
+    setDraggedAppointment(null)
+    setDragOverHour(null)
+  }, [draggedAppointment, updateAppointmentForReschedule, toast])
 
   const navigateDate = (direction: 'prev' | 'next') => {
     switch (viewMode) {
@@ -358,7 +455,12 @@ export default function AgendaPage() {
                       {hours.map((hour) => (
                         <div
                           key={hour}
-                          className="h-20 border-b border-gray-100 relative group hover:bg-blue-50 transition-colors cursor-pointer"
+                          className={`h-20 border-b border-gray-100 relative group hover:bg-blue-50 transition-colors cursor-pointer ${
+                            dragOverHour === hour ? 'bg-blue-100 ring-2 ring-blue-500' : ''
+                          }`}
+                          onDragOver={(e) => handleDragOver(e, hour)}
+                          onDragLeave={handleDragLeave}
+                          onDrop={(e) => handleDrop(e, currentDate, hour)}
                           onClick={() => {
                             handleNewAppointment(currentDate, `${String(hour).padStart(2, '0')}:00`)
                           }}
@@ -379,14 +481,17 @@ export default function AgendaPage() {
                             return (
                               <div
                                 key={appointment.id}
-                                className={`absolute left-1 right-1 p-2 rounded border-l-4 text-xs overflow-hidden ${statusStyle.bg} ${statusStyle.border} hover:opacity-90 transition-all cursor-pointer shadow-sm hover:shadow-md ${
+                                draggable
+                                className={`absolute left-1 right-1 p-2 rounded border-l-4 text-xs overflow-hidden ${statusStyle.bg} ${statusStyle.border} hover:opacity-90 transition-all cursor-move shadow-sm hover:shadow-md ${
                                   appointment.status === 'cancelled' ? 'opacity-60' : ''
-                                }`}
+                                } ${draggedAppointment?.id === appointment.id ? 'opacity-50 ring-2 ring-offset-2' : ''}`}
                                 style={{
                                   top: `${topOffset}px`,
                                   minHeight: `${Math.max(height, 30)}px`,
                                   zIndex: 10 + idx
                                 }}
+                                onDragStart={(e) => handleDragStart(e, appointment)}
+                                onDragEnd={handleDragEnd}
                                 onClick={(e) => {
                                   e.stopPropagation()
                                   handleEditAppointment(appointment)
@@ -497,7 +602,12 @@ export default function AgendaPage() {
                         {hours.map((hour) => (
                           <div
                             key={hour}
-                            className="h-20 border-b border-gray-100 relative group hover:bg-blue-100 transition-colors cursor-pointer"
+                            className={`h-20 border-b border-gray-100 relative group hover:bg-blue-100 transition-colors cursor-pointer ${
+                              dragOverHour === hour ? 'bg-blue-300 ring-2 ring-blue-500' : ''
+                            }`}
+                            onDragOver={(e) => handleDragOver(e, hour)}
+                            onDragLeave={handleDragLeave}
+                            onDrop={(e) => handleDrop(e, day, hour)}
                             onClick={() => {
                               handleNewAppointment(day, `${String(hour).padStart(2, '0')}:00`)
                             }}
@@ -518,14 +628,17 @@ export default function AgendaPage() {
                               return (
                                 <div
                                   key={appointment.id}
-                                  className={`absolute left-0.5 right-0.5 p-1 rounded border-l-4 text-xs overflow-hidden ${statusStyle.bg} ${statusStyle.border} hover:opacity-90 transition-all cursor-pointer shadow-sm hover:shadow-md ${
+                                  draggable
+                                  className={`absolute left-0.5 right-0.5 p-1 rounded border-l-4 text-xs overflow-hidden ${statusStyle.bg} ${statusStyle.border} hover:opacity-90 transition-all cursor-move shadow-sm hover:shadow-md ${
                                     appointment.status === 'cancelled' ? 'opacity-60' : ''
-                                  }`}
+                                  } ${draggedAppointment?.id === appointment.id ? 'opacity-50 ring-2 ring-offset-1' : ''}`}
                                   style={{
                                     top: `${topOffset}px`,
                                     minHeight: `${Math.max(height, 24)}px`,
                                     zIndex: 10 + idx
                                   }}
+                                  onDragStart={(e) => handleDragStart(e, appointment)}
+                                  onDragEnd={handleDragEnd}
                                   onClick={(e) => {
                                     e.stopPropagation()
                                     handleEditAppointment(appointment)
