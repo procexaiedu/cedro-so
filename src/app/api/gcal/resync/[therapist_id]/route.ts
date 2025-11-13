@@ -12,7 +12,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { createClient } from '@/lib/supabase';
 import { googleCalendarService } from '@/lib/google-calendar/service';
 
 interface ResyncParams {
@@ -51,11 +51,8 @@ export async function GET(
   context: { params: ResyncParams }
 ) {
   try {
-    // Criar cliente Supabase
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    );
+    // Criar cliente Supabase (com schema cedro configurado)
+    const supabase = createClient();
 
     const { therapist_id } = context.params;
     const { searchParams } = new URL(request.url);

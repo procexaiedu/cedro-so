@@ -14,7 +14,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { createClient } from '@/lib/supabase';
 import { googleCalendarService } from '@/lib/google-calendar/service';
 import type { GoogleCalendarEvent } from '@/lib/google-calendar/types';
 
@@ -40,11 +40,8 @@ interface ChannelRecord {
  */
 export async function POST(request: NextRequest) {
   try {
-    // Criar cliente Supabase
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    );
+    // Criar cliente Supabase (com schema cedro configurado)
+    const supabase = createClient();
 
     // Extrair headers do webhook
     const channelId = request.headers.get('x-goog-channel-id');

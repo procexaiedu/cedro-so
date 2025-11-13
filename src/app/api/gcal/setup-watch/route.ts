@@ -13,7 +13,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { createClient } from '@/lib/supabase';
 import { googleCalendarService } from '@/lib/google-calendar/service';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -63,11 +63,8 @@ export async function POST(request: NextRequest) {
       throw new Error('Missing APP_URL environment variable');
     }
 
-    // Criar cliente Supabase
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    );
+    // Criar cliente Supabase (com schema cedro configurado)
+    const supabase = createClient();
 
     const body = (await request.json()) as SetupWatchRequest;
     const { therapist_id } = body;
@@ -238,11 +235,8 @@ export async function POST(request: NextRequest) {
  */
 export async function GET(request: NextRequest) {
   try {
-    // Criar cliente Supabase
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    );
+    // Criar cliente Supabase (com schema cedro configurado)
+    const supabase = createClient();
 
     const { searchParams } = new URL(request.url);
     const therapistId = searchParams.get('therapist_id');
