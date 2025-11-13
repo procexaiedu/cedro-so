@@ -217,7 +217,18 @@ export default function AgendaPage() {
 
   const renderDayView = () => {
     const dayAppointments = getAppointmentsByDate(currentDate)
-    
+    const hours = Array.from({ length: 24 }, (_, i) => i)
+
+    // Group appointments by hour for positioning
+    const appointmentsByHour: Record<number, Appointment[]> = {}
+    dayAppointments.forEach((appointment) => {
+      const hour = new Date(appointment.start_at).getHours()
+      if (!appointmentsByHour[hour]) {
+        appointmentsByHour[hour] = []
+      }
+      appointmentsByHour[hour].push(appointment)
+    })
+
     return (
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
         {/* Mini Calendar */}
@@ -241,7 +252,7 @@ export default function AgendaPage() {
           </CardContent>
         </Card>
 
-        {/* Appointments List */}
+        {/* Timeline View with Time Axis */}
         <Card className="lg:col-span-3">
           <CardHeader>
             <CardTitle>{formatDateHeader()}</CardTitle>
@@ -250,28 +261,85 @@ export default function AgendaPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <ScrollArea className="h-[600px]">
-              {loading ? (
-                <AppointmentListSkeleton count={5} />
-              ) : dayAppointments.length === 0 ? (
-                <div className="text-center py-12">
-                  <CalendarIcon className="mx-auto h-12 w-12 text-gray-400" />
-                  <h3 className="mt-2 text-sm font-medium text-gray-900">Nenhum agendamento</h3>
-                  <p className="mt-1 text-sm text-gray-500">Não há agendamentos para este dia.</p>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {dayAppointments.map((appointment) => (
-                    <AppointmentCard 
-                  key={appointment.id} 
-                  appointment={appointment} 
-                  onUpdate={handleModalSave}
-                  onEdit={handleEditAppointment}
-                  onView={handleViewAppointment}
-                />
+            <ScrollArea className="h-[700px] w-full border rounded-lg">
+              <div className="flex">
+                {/* Time Axis */}
+                <div className="w-16 flex-shrink-0 pt-2">
+                  {hours.map((hour) => (
+                    <div
+                      key={hour}
+                      className="h-20 text-right pr-2 text-xs font-medium text-gray-500 border-t border-gray-100"
+                    >
+                      {String(hour).padStart(2, '0')}:00
+                    </div>
                   ))}
                 </div>
-              )}
+
+                {/* Appointments Grid */}
+                <div className="flex-1 relative border-l border-gray-200">
+                  {loading ? (
+                    <div className="p-4">
+                      <AppointmentListSkeleton count={5} />
+                    </div>
+                  ) : dayAppointments.length === 0 ? (
+                    <div className="text-center py-12 text-gray-500">
+                      <CalendarIcon className="mx-auto h-12 w-12 text-gray-400 mb-2" />
+                      <p className="text-sm">Nenhum agendamento para este dia</p>
+                    </div>
+                  ) : (
+                    <>
+                      {hours.map((hour) => (
+                        <div
+                          key={hour}
+                          className="h-20 border-b border-gray-100 relative group hover:bg-blue-50 transition-colors cursor-pointer"
+                          onClick={() => {
+                            handleNewAppointment(currentDate, `${String(hour).padStart(2, '0')}:00`)
+                          }}
+                        >
+                          {appointmentsByHour[hour]?.map((appointment, idx) => {
+                            const startHour = new Date(appointment.start_at).getHours()
+                            const startMinutes = new Date(appointment.start_at).getMinutes()
+                            const endHour = new Date(appointment.end_at).getHours()
+                            const endMinutes = new Date(appointment.end_at).getMinutes()
+
+                            const durationMinutes = (endHour - startHour) * 60 + (endMinutes - startMinutes)
+                            const topOffset = (startMinutes / 60) * 80 // 80px per hour
+                            const height = (durationMinutes / 60) * 80 // Height proportional to duration
+
+                            return (
+                              <div
+                                key={appointment.id}
+                                className={`absolute left-1 right-1 p-2 rounded border-l-4 text-xs overflow-hidden bg-blue-100 border-blue-500 hover:bg-blue-200 transition-colors cursor-pointer shadow-sm ${
+                                  appointment.status === 'cancelled' ? 'opacity-50' : ''
+                                }`}
+                                style={{
+                                  top: `${topOffset}px`,
+                                  minHeight: `${Math.max(height, 30)}px`,
+                                  zIndex: 10 + idx
+                                }}
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  handleEditAppointment(appointment)
+                                }}
+                              >
+                                <div className="font-medium truncate">
+                                  {format(parseISO(appointment.start_at), 'HH:mm')}
+                                </div>
+                                <div className="truncate text-gray-700 font-semibold">
+                                  {appointment.patient_name}
+                                </div>
+                                <div className="text-gray-600 truncate">
+                                  {appointment.therapist_name}
+                                </div>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      ))}
+                    </>
+                  )}
+                </div>
+              </div>
             </ScrollArea>
           </CardContent>
         </Card>
@@ -282,6 +350,7 @@ export default function AgendaPage() {
   const renderWeekView = () => {
     const weekStart = startOfWeek(currentDate, { locale: ptBR })
     const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i))
+    const hours = Array.from({ length: 24 }, (_, i) => i)
 
     return (
       <Card>
@@ -289,39 +358,111 @@ export default function AgendaPage() {
           <CardTitle>{formatDateHeader()}</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-7 gap-4">
-            {weekDays.map((day) => {
-              const dayAppointments = getAppointmentsByDate(day)
-              const isToday = isSameDay(day, new Date())
-              
-              return (
-                <div key={day.toISOString()} className="space-y-2">
-                  <div className={`text-center p-2 rounded-lg ${isToday ? 'bg-blue-100 text-blue-900' : 'bg-gray-50'}`}>
-                    <div className="text-sm font-medium">
-                      {format(day, 'EEE', { locale: ptBR })}
-                    </div>
-                    <div className="text-lg font-bold">
-                      {format(day, 'd')}
-                    </div>
+          <ScrollArea className="w-full border rounded-lg">
+            <div className="flex">
+              {/* Time Axis */}
+              <div className="w-16 flex-shrink-0 pt-8">
+                {hours.map((hour) => (
+                  <div
+                    key={hour}
+                    className="h-20 text-right pr-2 text-xs font-medium text-gray-500 border-t border-gray-100"
+                  >
+                    {String(hour).padStart(2, '0')}:00
                   </div>
-                  <ScrollArea className="h-[400px]">
-                    <div className="space-y-1">
-                      {dayAppointments.map((appointment) => (
-                        <AppointmentCard 
-                          key={appointment.id} 
-                          appointment={appointment} 
-                          onUpdate={handleModalSave}
-                          onEdit={handleEditAppointment}
-                          onView={handleViewAppointment}
-                          compact={true}
-                        />
-                      ))}
+                ))}
+              </div>
+
+              {/* Days Grid */}
+              <div className="flex flex-1 border-l border-gray-200">
+                {weekDays.map((day) => {
+                  const dayAppointments = getAppointmentsByDate(day)
+                  const isToday = isSameDay(day, new Date())
+
+                  // Group appointments by hour
+                  const appointmentsByHour: Record<number, Appointment[]> = {}
+                  dayAppointments.forEach((appointment) => {
+                    const hour = new Date(appointment.start_at).getHours()
+                    if (!appointmentsByHour[hour]) {
+                      appointmentsByHour[hour] = []
+                    }
+                    appointmentsByHour[hour].push(appointment)
+                  })
+
+                  return (
+                    <div
+                      key={day.toISOString()}
+                      className={`flex-1 border-r border-gray-200 min-w-[140px] ${
+                        isToday ? 'bg-blue-50' : ''
+                      }`}
+                    >
+                      {/* Day Header */}
+                      <div
+                        className={`text-center p-2 border-b border-gray-200 sticky top-0 z-20 ${
+                          isToday ? 'bg-blue-100 text-blue-900' : 'bg-gray-50'
+                        }`}
+                      >
+                        <div className="text-sm font-medium">
+                          {format(day, 'EEE', { locale: ptBR })}
+                        </div>
+                        <div className="text-lg font-bold">
+                          {format(day, 'd')}
+                        </div>
+                      </div>
+
+                      {/* Time Grid */}
+                      <div className="relative">
+                        {hours.map((hour) => (
+                          <div
+                            key={hour}
+                            className="h-20 border-b border-gray-100 relative group hover:bg-blue-100 transition-colors cursor-pointer"
+                            onClick={() => {
+                              handleNewAppointment(day, `${String(hour).padStart(2, '0')}:00`)
+                            }}
+                          >
+                            {appointmentsByHour[hour]?.map((appointment, idx) => {
+                              const startHour = new Date(appointment.start_at).getHours()
+                              const startMinutes = new Date(appointment.start_at).getMinutes()
+                              const endHour = new Date(appointment.end_at).getHours()
+                              const endMinutes = new Date(appointment.end_at).getMinutes()
+
+                              const durationMinutes = (endHour - startHour) * 60 + (endMinutes - startMinutes)
+                              const topOffset = (startMinutes / 60) * 80 // 80px per hour
+                              const height = (durationMinutes / 60) * 80 // Height proportional to duration
+
+                              return (
+                                <div
+                                  key={appointment.id}
+                                  className={`absolute left-0.5 right-0.5 p-1 rounded border-l-4 text-xs overflow-hidden bg-blue-100 border-blue-500 hover:bg-blue-200 transition-colors cursor-pointer shadow-sm ${
+                                    appointment.status === 'cancelled' ? 'opacity-50' : ''
+                                  }`}
+                                  style={{
+                                    top: `${topOffset}px`,
+                                    minHeight: `${Math.max(height, 24)}px`,
+                                    zIndex: 10 + idx
+                                  }}
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    handleEditAppointment(appointment)
+                                  }}
+                                >
+                                  <div className="font-medium truncate text-gray-900">
+                                    {format(parseISO(appointment.start_at), 'HH:mm')}
+                                  </div>
+                                  <div className="truncate text-gray-700">
+                                    {appointment.patient_name}
+                                  </div>
+                                </div>
+                              )
+                            })}
+                          </div>
+                        ))}
+                      </div>
                     </div>
-                  </ScrollArea>
-                </div>
-              )
-            })}
-          </div>
+                  )
+                })}
+              </div>
+            </div>
+          </ScrollArea>
         </CardContent>
       </Card>
     )
