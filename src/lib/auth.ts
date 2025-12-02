@@ -76,6 +76,38 @@ export async function mapAuthUserToCedroUser(authUser: User): Promise<CedroUser 
     }
 
     if (existingUser) {
+      // Check for ID mismatch (legacy user issue) and migrate if necessary
+      if (existingUser.id !== authUser.id) {
+        console.warn('⚠️ ID mismatch detected! Attempting to migrate user data...', {
+          cedroId: existingUser.id,
+          authId: authUser.id,
+          email: authUser.email
+        })
+        
+        try {
+          // Call RPC to migrate data
+          // Note: We use RPC because we need to update PKs and FKs transactionally
+          const { data: migrationResult, error: migrationError } = await supabase
+            .rpc('sync_user_id', {
+              email_input: authUser.email,
+              auth_id: authUser.id
+            })
+            
+          if (migrationError) {
+            console.error('❌ Migration RPC failed:', migrationError)
+            // Fallback: return existing user, but warn about instability
+            console.warn('⚠️ Returning mismatched user due to migration failure. Application may be unstable.')
+          } else {
+            console.log('✅ User migration successful:', migrationResult)
+            // Update the ID in the object we're about to return
+            // This ensures the session immediately uses the correct, new ID
+            existingUser.id = authUser.id
+          }
+        } catch (e) {
+          console.error('❌ Exception during user migration:', e)
+        }
+      }
+
       console.log('✅ Found existing user, returning:', { id: existingUser.id, email: existingUser.email, role: existingUser.role })
       return existingUser as CedroUser
     }

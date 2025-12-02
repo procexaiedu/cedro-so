@@ -1,0 +1,209 @@
+
+
+# **PROMPT ORGANIZADO - CONTEXTO COMPLETO DO PROJETO CEDRO** 
+
+## **1. Visão Geral**
+
+* O projeto **Cedro** é uma solução para uma clínica de psicologia.
+* A arquitetura é baseada em **agentes de IA** responsáveis por diferentes operações.
+* Todo o sistema hoje está **corrompido**, **inconsistente**, **instável** e com **arquitetura suja**.
+* Objetivo: **retomar, corrigir e reestruturar completamente o sistema**, módulo por módulo.
+
+---
+
+# **2. Arquitetura de Agentes**
+
+## **2.1. Estrutura Atual**
+
+Agente principal:
+
+* **Agente de Atendimento**
+
+Subagentes:
+
+* **Agendamento**
+* **Financeiro**
+* **CRM**
+* **Closer**
+
+## **2.2. Escopo esperado**
+
+* **Agendamento:** criar, atualizar e sincronizar compromissos.
+* **Financeiro:** gerar cobranças via Asaas e persistir no BD.
+* **CRM:** criar e qualificar leads → converter para pacientes.
+* **Closer:** atuar no fechamento, enviar resumos e acionar quando necessário.
+
+## **2.3. Problema central**
+
+* Por desorganização, o agente **Closer virou agente administrativo**, sobrecarregando-o.
+* Subagentes estão **limitados**, **inconsistentes**, **sem regras claras**.
+* Precisam ser revisados depois — **mas não agora**.
+* **Agora o foco é o SISTEMA**.
+
+---
+
+# **3. Problemas Gerais do Sistema**
+
+* Interface ruim.
+* Carregamento infinito.
+* Bugs de autenticação.
+* Timeouts constantes.
+* Botões que não funcionam.
+* Páginas que quebram.
+* Falta de tratamento de estados.
+* Falta de consistência visual.
+* Falta de validação.
+* Módulos incompletos.
+* Tabelas no banco que não são utilizadas.
+* Fluxos interrompidos ou corrompidos.
+
+**Resumo:** o sistema inteiro está **quebrado, lento, inconsistente e mal implementado.**
+
+---
+
+# **4. Problemas Críticos por Módulo**
+
+## **4.1. Autenticação**
+
+* Usuários novos entram normalmente.
+* Usuários “com histórico” travam:
+
+  * Página carrega infinitamente.
+  * Só depois de dar timeout aparece a tela de login.
+* Login demorado ou inconsistente.
+
+---
+
+## **4.2. Agenda**
+
+* Banco usa tabela interna de agendamentos.
+* Existe integração com Google Calendar **não testada**.
+* Primeira sincronização foi manual.
+* **Não se sabe se está funcionando de forma bidirecional.**
+* Filtros não exibem o terapeuta **Leandro Carone** (admin + terapeuta).
+* Disponibilidade aparece, mas não no filtro principal.
+
+---
+
+## **4.3. CRM**
+
+* Muitos leads convertidos **não aparecem**.
+* Parece existir um limite de **100 registros** sendo exibidos.
+* Leads em “Lead” (etapa inicial) **quebram** ao abrir “Visualizar”.
+* Leads em “SQL” também quebram.
+* Página fica carregando infinito.
+
+---
+
+## **4.4. Financeiro**
+
+* Integração Asaas foi criada para persistir no BD.
+* Muitos registros **não foram persistidos** porque o agente Closer falhou.
+* Módulo de financeiro lê do BD → então está **incompleto**.
+* Ideal seria refletir direto do Asaas (pull), não depender do Closer.
+
+---
+
+## **4.5. Módulo de Conversas**
+
+* Era para importar histórico do WhatsApp.
+* Ficou **incompleto** e agora aparece “sobrando”.
+* Foi substituído pelo Chatwoot.
+* Arquivos e componentes do módulo ficaram “fantasmas”.
+
+---
+
+## **4.6. Dashboard**
+
+* Carregamento infinito.
+* Dados inconsistentes.
+* Travamentos constantes.
+
+---
+
+## **4.7. Prontuário**
+
+* Backend via n8n.
+* Modelo não está funcional.
+* Não está integrado com o app.
+
+---
+
+# **5. Problemas de Usuário / Permissões**
+
+* Existem dois tipos de usuários:
+
+  * **Administrador**
+  * **Terapeuta**
+* Administrador deveria enxergar tudo.
+* Terapeuta deveria ver apenas o que é dele.
+* Hoje:
+
+  * Permissões falham.
+  * Filtros não funcionam.
+  * Administrador às vezes não aparece como terapeuta.
+  * Dados ficam inconsistentes.
+
+---
+
+# **6. Banco de Dados**
+
+* Estrutura não ideal.
+* Existem tabelas que não são usadas.
+* Campos inúteis.
+* Registros inconsistentes.
+* Falta saneamento.
+* Falta padronização.
+* Precisará ser analisado via **MCP do Supabase**, com queries em tempo real.
+
+---
+
+# **7. Pontos Importantes**
+
+* Os agentes **não serão ajustados agora**.
+* O foco **100% é no sistema web**.
+* Você (IA) tem que:
+
+  * Entender o sistema atual.
+  * Aceitar que ele está completamente quebrado.
+  * Trabalhar para reestruturá-lo com assertividade.
+  * Usar o **MCP do Supabase** (SEMPRE schema 'cedro') para:
+
+    * Consultar tabelas.
+    * Ver dados reais.
+    * Identificar tabelas mortas.
+    * Mapear relacionamentos.
+    * Diagnosticar inconsistências.
+
+---
+
+# **8. Objetivo Final**
+
+* Sistema funcional.
+* Interface coerente.
+* Permissões corretas.
+* CRM funcionando.
+* Agenda sincronizada com Google.
+* Financeiro refletindo corretamente.
+* Dashboard carregando corretamente.
+* Prontuário funcional.
+* Módulos limpos sem lixo.
+* Código limpo e reestruturado.
+* Fluxos confiáveis.
+* Evitar retrabalho.
+* Garantir que o projeto fique estável para evitar cancelamento do cliente.
+
+---
+
+# **9. Mensagem Final ao Agente / Desenvolvedor**
+
+> “Você não participou da criação.
+> Você não desenvolveu nada disso.
+> Você precisa assumir que está tudo um lixo.
+> Seu trabalho é **corrigir**.
+>
+> Entenda tudo, investigue tudo via Supabase MCP,
+> module por módulo,
+> até o sistema estar funcional.”
+
+

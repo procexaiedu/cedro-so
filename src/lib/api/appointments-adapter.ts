@@ -81,7 +81,7 @@ async function fallbackGetAppointmentsWithDetails(
     const endISO = endDate.toISOString()
 
     // Get appointments
-    const { data: appointments, error: apptError } = await supabase
+    let query = supabase
       .schema('cedro')
       .from('appointments')
       .select('*')
@@ -89,12 +89,14 @@ async function fallbackGetAppointmentsWithDetails(
       .lte('start_at', endISO)
       .order('start_at', { ascending: true })
 
-    if (apptError || !appointments) {
-      throw apptError || new Error('No appointments found')
+    if (therapistId) {
+      query = query.eq('therapist_id', therapistId)
     }
 
-    if (therapistId) {
-      appointments.filter(a => a.therapist_id === therapistId)
+    const { data: appointments, error: apptError } = await query
+
+    if (apptError || !appointments) {
+      throw apptError || new Error('No appointments found')
     }
 
     // Get all related data in parallel
@@ -133,7 +135,7 @@ export async function getTherapistsList() {
       .schema('cedro')
       .from('users')
       .select('id, name, email, role')
-      .eq('role', 'therapist')
+      .in('role', ['therapist', 'admin'])
       .order('name', { ascending: true })
 
     if (error) {

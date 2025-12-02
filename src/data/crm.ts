@@ -871,12 +871,26 @@ function getEmptyStats(): LeadStats {
 }
 
 // Utility functions for formatting
-export function formatDate(dateString: string): string {
-  return new Date(dateString).toLocaleDateString('pt-BR')
+export function formatDate(dateString: string | null | undefined): string {
+  if (!dateString) return '-'
+  try {
+    const date = new Date(dateString)
+    if (isNaN(date.getTime())) return '-'
+    return date.toLocaleDateString('pt-BR')
+  } catch (e) {
+    return '-'
+  }
 }
 
-export function formatDateTime(dateString: string): string {
-  return new Date(dateString).toLocaleString('pt-BR')
+export function formatDateTime(dateString: string | null | undefined): string {
+  if (!dateString) return '-'
+  try {
+    const date = new Date(dateString)
+    if (isNaN(date.getTime())) return '-'
+    return date.toLocaleString('pt-BR')
+  } catch (e) {
+    return '-'
+  }
 }
 
 export function getStageColor(stage: LeadStage): 'default' | 'secondary' | 'destructive' | 'outline' {

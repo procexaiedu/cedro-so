@@ -78,7 +78,7 @@ export default function CRMPage() {
     setLoading(true)
     try {
       const [leadsData, statsData, sourcesData] = await Promise.all([
-        getLeads({}, { page: 1, limit: 100 }),
+        getLeads({}, { page: 1, limit: 1000 }),
         getLeadStats(),
         getLeadSourcesData()
       ])

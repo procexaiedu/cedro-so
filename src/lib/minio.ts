@@ -1,31 +1,28 @@
-import { Client } from 'minio'
+import fs from 'fs'
+import path from 'path'
+import { promisify } from 'util'
 
-// MinIO client configuration
-const minioClient = new Client({
-  endPoint: process.env.MINIO_ENDPOINT || 'localhost',
-  port: parseInt(process.env.MINIO_PORT || '9000'),
-  useSSL: process.env.MINIO_USE_SSL === 'true',
-  accessKey: process.env.MINIO_ACCESS_KEY || '',
-  secretKey: process.env.MINIO_SECRET_KEY || ''
-})
+const writeFile = promisify(fs.writeFile)
+const readFile = promisify(fs.readFile)
+const unlink = promisify(fs.unlink)
+const readdir = promisify(fs.readdir)
+const mkdir = promisify(fs.mkdir)
 
-const BUCKET_NAME = process.env.MINIO_BUCKET_NAME || 'cedro-audio'
+// Local storage directory for audio files
+const STORAGE_DIR = path.join(process.cwd(), 'storage', 'audio')
 
-// Ensure bucket exists
+// Ensure storage directory exists
 export async function ensureBucketExists() {
   try {
-    const exists = await minioClient.bucketExists(BUCKET_NAME)
-    if (!exists) {
-      await minioClient.makeBucket(BUCKET_NAME, 'us-east-1')
-      console.log(`Bucket ${BUCKET_NAME} created successfully`)
-    }
+    await mkdir(STORAGE_DIR, { recursive: true })
+    console.log(`Storage directory ${STORAGE_DIR} ensured`)
   } catch (error) {
-    console.error('Error ensuring bucket exists:', error)
+    console.error('Error ensuring storage directory exists:', error)
     throw error
   }
 }
 
-// Upload audio file to MinIO
+// Upload audio file to local storage
 export async function uploadAudioFile(
   fileName: string, 
   fileBuffer: Buffer, 
@@ -34,94 +31,91 @@ export async function uploadAudioFile(
   try {
     await ensureBucketExists()
     
-    const objectName = `audio/${Date.now()}-${fileName}`
+    // Clean filename to avoid issues
+    const cleanFileName = path.basename(fileName)
+    const objectName = `${Date.now()}-${cleanFileName}`
+    const filePath = path.join(STORAGE_DIR, objectName)
     
-    await minioClient.putObject(
-      BUCKET_NAME, 
-      objectName, 
-      fileBuffer, 
-      fileBuffer.length,
-      {
-        'Content-Type': 'audio/webm',
-        ...metadata
-      }
-    )
+    await writeFile(filePath, fileBuffer)
     
-    // Return the object URL
-    return `${process.env.MINIO_PUBLIC_URL || 'http://localhost:9000'}/${BUCKET_NAME}/${objectName}`
+    console.log(`File uploaded locally to ${filePath}`)
+    
+    // Return a local URL that can be accessed via the API route we created
+    // Note: This requires the API route /api/audio/file/[filename] to be implemented
+    return `/api/audio/file/${objectName}`
   } catch (error) {
     console.error('Error uploading audio file:', error)
     throw error
   }
 }
 
-// Download audio file from MinIO
+// Download audio file from local storage
 export async function downloadAudioFile(objectName: string): Promise<Buffer> {
   try {
-    // Extract object name from URL if full URL is provided
-    const cleanObjectName = objectName.includes(BUCKET_NAME) 
-      ? objectName.split(`${BUCKET_NAME}/`)[1]
-      : objectName
+    // Extract filename from URL if needed
+    // Handles both full URLs and just filenames
+    let fileName = objectName
+    if (objectName.includes('/api/audio/file/')) {
+      fileName = objectName.split('/api/audio/file/')[1]
+    } else if (objectName.includes('/')) {
+      fileName = path.basename(objectName)
+    }
     
-    const stream = await minioClient.getObject(BUCKET_NAME, cleanObjectName)
-    
-    const chunks: Buffer[] = []
-    return new Promise((resolve, reject) => {
-      stream.on('data', (chunk) => chunks.push(chunk))
-      stream.on('end', () => resolve(Buffer.concat(chunks)))
-      stream.on('error', reject)
-    })
+    const filePath = path.join(STORAGE_DIR, fileName)
+    return await readFile(filePath)
   } catch (error) {
     console.error('Error downloading audio file:', error)
     throw error
   }
 }
 
-// Generate presigned URL for audio file
+// Generate presigned URL for audio file (just return the local URL)
 export async function getPresignedUrl(objectName: string, expiry: number = 3600): Promise<string> {
   try {
-    const cleanObjectName = objectName.includes(BUCKET_NAME) 
-      ? objectName.split(`${BUCKET_NAME}/`)[1]
-      : objectName
+    let fileName = objectName
+    if (objectName.includes('/api/audio/file/')) {
+      fileName = objectName.split('/api/audio/file/')[1]
+    } else if (objectName.includes('/')) {
+      fileName = path.basename(objectName)
+    }
     
-    return await minioClient.presignedGetObject(BUCKET_NAME, cleanObjectName, expiry)
+    return `/api/audio/file/${fileName}`
   } catch (error) {
     console.error('Error generating presigned URL:', error)
     throw error
   }
 }
 
-// Delete audio file from MinIO
+// Delete audio file from local storage
 export async function deleteAudioFile(objectName: string): Promise<void> {
   try {
-    const cleanObjectName = objectName.includes(BUCKET_NAME) 
-      ? objectName.split(`${BUCKET_NAME}/`)[1]
-      : objectName
+    let fileName = objectName
+    if (objectName.includes('/api/audio/file/')) {
+      fileName = objectName.split('/api/audio/file/')[1]
+    } else if (objectName.includes('/')) {
+      fileName = path.basename(objectName)
+    }
     
-    await minioClient.removeObject(BUCKET_NAME, cleanObjectName)
+    const filePath = path.join(STORAGE_DIR, fileName)
+    
+    // Check if file exists before trying to delete
+    if (fs.existsSync(filePath)) {
+        await unlink(filePath)
+    }
   } catch (error) {
     console.error('Error deleting audio file:', error)
-    throw error
+    // Don't throw on delete error to avoid blocking flows
   }
 }
 
 // List audio files
-export async function listAudioFiles(prefix: string = 'audio/'): Promise<string[]> {
+export async function listAudioFiles(prefix: string = ''): Promise<string[]> {
   try {
-    const objectsList: string[] = []
-    const stream = minioClient.listObjects(BUCKET_NAME, prefix, true)
-    
-    return new Promise((resolve, reject) => {
-      stream.on('data', (obj) => {
-        if (obj.name) {
-          objectsList.push(obj.name)
-        }
-      })
-      stream.on('end', () => resolve(objectsList))
-      stream.on('error', reject)
-    })
+    await ensureBucketExists()
+    const files = await readdir(STORAGE_DIR)
+    return files.filter(file => file.startsWith(prefix))
   } catch (error) {
     console.error('Error listing audio files:', error)
-    throw error
+    return []
   }
 }

@@ -88,9 +88,9 @@ export function SupabaseProvider({ children }: { children: React.ReactNode }) {
       try {
         console.log('📡 Calling supabase.auth.getSession()...')
 
-        // Add timeout to prevent infinite hanging
+        // Reduced timeout to 10 seconds for better UX
         const timeoutPromise = new Promise((_, reject) => {
-          setTimeout(() => reject(new Error('getSession timeout after 30 seconds')), 30000)
+          setTimeout(() => reject(new Error('getSession timeout after 10 seconds')), 10000)
         })
 
         const sessionPromise = supabase.auth.getSession()
@@ -115,41 +115,38 @@ export function SupabaseProvider({ children }: { children: React.ReactNode }) {
         console.log('✅ Setting session and user state...')
         setSession(session)
         setUser(session?.user ?? null)
+        
+        // CRITICAL CHANGE: Stop loading immediately after getting auth session
+        // Don't wait for cedroUser profile to load before showing UI
+        setLoading(false)
 
         if (session?.user) {
-          console.log('👤 User found, mapping to CedroUser...')
-          const mappedUser = await safeMapAuthUserToCedroUser(session.user)
-          console.log('🔄 mapAuthUserToCedroUser result:', {
-            success: !!mappedUser,
-            userId: mappedUser?.id,
-            userEmail: mappedUser?.email,
-            userRole: mappedUser?.role
+          console.log('👤 User found, mapping to CedroUser in background...')
+          // Load profile in background
+          safeMapAuthUserToCedroUser(session.user).then(mappedUser => {
+             if (isMounted) {
+                console.log('🔄 Setting cedroUser state (async):', mappedUser ? 'with user data' : 'to null')
+                setCedroUser(mappedUser)
+             }
           })
-          if (isMounted) {
-            console.log('🔄 Setting cedroUser state:', mappedUser ? 'with user data' : 'to null')
-            setCedroUser(mappedUser)
-          }
         } else {
           console.log('👤 No user in session')
           setCedroUser(null)
         }
 
-        if (isMounted) {
-          console.log('🏁 Setting loading to false')
-          setLoading(false)
-        }
       } catch (error) {
         console.error('❌ Error in getInitialSession:', error)
 
         // Emergency fallback - if Supabase is completely unresponsive
         if (error instanceof Error && error.message?.includes('timeout')) {
           console.log('⚠️ Supabase timeout detected - using emergency fallback')
-
-          // Try to redirect to login as fallback
           if (typeof window !== 'undefined') {
-            console.log('🔄 Emergency redirect to login')
-            window.location.href = '/login'
-            return
+             // Instead of redirecting immediately, just clear state and let UI decide
+             setSession(null)
+             setUser(null)
+             setCedroUser(null)
+             setLoading(false) 
+             return
           }
         }
 
@@ -178,35 +175,25 @@ export function SupabaseProvider({ children }: { children: React.ReactNode }) {
 
         setSession(session)
         setUser(session?.user ?? null)
+        
+        // Unblock UI immediately on auth change too
+        if (event !== 'INITIAL_SESSION') { // INITIAL_SESSION is handled by getInitialSession
+             setLoading(false)
+        }
 
         if (session?.user) {
-          console.log('🔄 Auth state change - mapping user to CedroUser...')
-          const mappedUser = await safeMapAuthUserToCedroUser(session.user)
-          console.log('🔄 Auth state change - mapAuthUserToCedroUser result:', {
-            success: !!mappedUser,
-            userId: mappedUser?.id,
-            userEmail: mappedUser?.email,
-            userRole: mappedUser?.role
+          console.log('🔄 Auth state change - mapping user to CedroUser (background)...')
+          safeMapAuthUserToCedroUser(session.user).then(mappedUser => {
+             if (isMounted) {
+               console.log('🔄 Auth state change - setting cedroUser state (async):', mappedUser ? 'with user data' : 'to null')
+               setCedroUser(mappedUser)
+             }
           })
-          if (isMounted) {
-            console.log('🔄 Auth state change - setting cedroUser state:', mappedUser ? 'with user data' : 'to null')
-            setCedroUser(mappedUser)
-            setLoading(false)
-          }
         } else {
           console.log('👤 No user in auth state change')
           setCedroUser(null)
+          // Ensure loading is false if logged out
           setLoading(false)
-        }
-
-        // Force loading false after 35 seconds as absolute fallback
-        if (isMounted) {
-          authStateChangeTimeout = setTimeout(() => {
-            console.warn('⚠️ FORCED TIMEOUT: Setting loading to false after 35 seconds')
-            if (isMounted) {
-              setLoading(false)
-            }
-          }, 35000)
         }
       }
     )
