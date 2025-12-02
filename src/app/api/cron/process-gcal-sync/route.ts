@@ -136,16 +136,21 @@ export async function POST(request: NextRequest) {
           );
         }
 
-        const appointmentWithTherapist = appointment as AppointmentWithTherapist;
+        const appointmentWithTherapist = appointment as any as AppointmentWithTherapist;
 
         // Verificar se terapeuta tem Google Calendar configurado
-        if (!appointmentWithTherapist.therapist?.google_calendar_id) {
+        // Nota: O Supabase retorna arrays para relações, então precisamos pegar o primeiro item se for array
+        const therapist = Array.isArray(appointmentWithTherapist.therapist) 
+          ? appointmentWithTherapist.therapist[0] 
+          : appointmentWithTherapist.therapist;
+          
+        if (!therapist?.google_calendar_id) {
           throw new Error(
             `Therapist has no Google Calendar configured (therapist_id: ${appointmentWithTherapist.therapist_id})`
           );
         }
 
-        const calendarId = appointmentWithTherapist.therapist.google_calendar_id;
+        const calendarId = therapist.google_calendar_id;
 
         // 3. Executar ação apropriada
         console.log(`Processing job ${job.id}: ${job.action} for appointment ${job.appointment_id}`);
