@@ -17,7 +17,12 @@ import { googleCalendarService } from '@/lib/google-calendar/service';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
+  process.env.SUPABASE_SERVICE_ROLE_KEY!,
+  {
+    db: {
+      schema: 'cedro',
+    },
+  }
 );
 
 interface ResyncParams {
@@ -116,7 +121,7 @@ export async function GET(
     // 3. Processar eventos (mesmo código do webhook)
     let processedCount = 0;
     let ignoredCount = 0;
-    const errors = [];
+    const errors: { eventId: string; error: string }[] = [];
 
     for (const event of events) {
       try {

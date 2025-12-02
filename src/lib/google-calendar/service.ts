@@ -20,7 +20,12 @@ import { createClient } from '@supabase/supabase-js';
 // Supabase client para persistir dados
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
+  process.env.SUPABASE_SERVICE_ROLE_KEY!,
+  {
+    db: {
+      schema: 'cedro',
+    },
+  }
 );
 
 const TIMEZONE = 'America/Sao_Paulo';
