@@ -127,7 +127,7 @@ export function AppointmentModal({
       const duration = Math.round((endDate.getTime() - startDate.getTime()) / (1000 * 60))
       
       setFormData({
-        patient_id: appointment.patient_id,
+        patient_id: appointment.patient_id || '',
         therapist_id: appointment.therapist_id,
         service_id: appointment.service_id || '',
         status: appointment.status,
@@ -254,7 +254,16 @@ export function AppointmentModal({
       channel: null,
       origin_message_id: null,
       notes: formData.notes || null,
-      meet_link: null
+      meet_link: null,
+      summary: null,
+      external_event_id: null,
+      external_calendar_id: null,
+      origin: 'system',
+      recurring_event_id: null,
+      ical_uid: null,
+      source_updated_at: null,
+      html_link: null,
+      gcal_etag: null
     }
 
     if (isCreating) {

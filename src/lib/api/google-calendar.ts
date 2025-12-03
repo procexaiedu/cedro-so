@@ -32,6 +32,11 @@ export async function getSyncedAppointments(
         therapist_id,
         patient_id,
         service_id,
+        care_plan_id,
+        channel,
+        origin_message_id,
+        meet_link,
+        ical_uid,
         summary,
         start_at,
         end_at,
@@ -92,6 +97,17 @@ export async function getUnlinkedGoogleAppointments(
         `
         id,
         therapist_id,
+        patient_id,
+        service_id,
+        care_plan_id,
+        channel,
+        origin_message_id,
+        meet_link,
+        ical_uid,
+        origin,
+        external_calendar_id,
+        gcal_etag,
+        source_updated_at,
         summary,
         start_at,
         end_at,
@@ -101,7 +117,8 @@ export async function getUnlinkedGoogleAppointments(
         html_link,
         recurring_event_id,
         therapist:therapist_id (name),
-        created_at
+        created_at,
+        updated_at
       `
       )
       .eq('origin', 'google')

@@ -54,7 +54,7 @@ export function AppointmentGoogleCalendarInfo({
             variant="outline"
             size="sm"
             className="gap-1 h-8"
-            onClick={() => window.open(appointment.html_link, '_blank')}
+            onClick={() => appointment.html_link && window.open(appointment.html_link, '_blank')}
           >
             <ExternalLink className="w-3.5 h-3.5" />
             Ver no Google

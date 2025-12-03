@@ -58,7 +58,7 @@ export interface PatientWithTherapist extends Patient {
 
 export interface Appointment extends Timestamps {
   id: string
-  patient_id: string
+  patient_id: string | null
   therapist_id: string
   service_id: string | null
   care_plan_id: string | null
@@ -69,6 +69,17 @@ export interface Appointment extends Timestamps {
   origin_message_id: string | null
   notes: string | null
   meet_link: string | null
+
+  // Google Calendar / Sync fields
+  summary: string | null
+  external_event_id: string | null
+  external_calendar_id: string | null
+  origin: string | null
+  recurring_event_id: string | null
+  ical_uid: string | null
+  source_updated_at: string | null
+  html_link: string | null
+  gcal_etag: string | null
 }
 
 export interface AppointmentWithDetails extends Appointment {
