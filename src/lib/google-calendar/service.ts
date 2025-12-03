@@ -108,7 +108,7 @@ export class GoogleCalendarService {
         htmlLink: event.htmlLink,
       });
 
-      return event;
+      return event as unknown as GoogleCalendarEvent;
     } catch (error) {
       await this.logSync({
         event_id: appointment.id,
@@ -200,7 +200,7 @@ export class GoogleCalendarService {
         etag: event.etag,
       });
 
-      return event;
+      return event as unknown as GoogleCalendarEvent;
     } catch (error) {
       await this.logSync({
         event_id: appointment.external_event_id,
@@ -313,7 +313,7 @@ export class GoogleCalendarService {
       );
 
       return {
-        events: data.items || [],
+        events: (data.items || []) as unknown as GoogleCalendarEvent[],
         nextSyncToken: data.nextSyncToken,
       };
     } catch (error: any) {
